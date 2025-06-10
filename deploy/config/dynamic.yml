@@ -1,0 +1,62 @@
+# Dynamic configuration file
+# This file will be managed by the Traefik UI
+
+http:
+  routers:
+    # Example router (will be managed by UI)
+    traefik-dashboard:
+      rule: "Host(`traefik.local`)"
+      service: "api@internal"
+      entryPoints:
+        - web
+
+  services:
+    # Services will be added here by the UI
+
+  middlewares:
+    # Common middlewares
+    default-headers:
+      headers:
+        frameDeny: true
+        sslRedirect: true
+        browserXssFilter: true
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+
+    secure-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - OPTIONS
+          - PUT
+        accessControlMaxAge: 100
+        hostsProxyHeaders:
+          - "X-Forwarded-Host"
+
+tls:
+  options:
+    default:
+      sslProtocols:
+        - "TLSv1.2"
+        - "TLSv1.3"
+      minVersion: "VersionTLS12"
+      cipherSuites:
+        - "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+        - "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
+        - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+
+  stores:
+    default:
+      defaultCertificate:
+        certFile: ""
+        keyFile: ""
+
+  certificates: []
+
+# Server transports for backend services
+serversTransports:
+  insecureTransport:
+    insecureSkipVerify: true

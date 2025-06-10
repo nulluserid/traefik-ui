@@ -1,0 +1,74 @@
+# Global configuration
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+# Experimental features (required for plugins)
+experimental:
+  plugins:
+    crowdsec-bouncer-traefik-plugin:
+      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      version: v1.3.0
+
+# API and dashboard configuration
+api:
+  dashboard: true
+  debug: true
+  insecure: true  # Only for internal use
+
+# EntryPoints
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+
+# Providers
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: traefik
+  file:
+    filename: /dynamic.yml
+    watch: true
+
+# Certificate resolvers for Let's Encrypt
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: admin@example.com  # Change this to your email
+      storage: /data/acme.json
+      dnsChallenge:
+        provider: rfc2136
+        delayBeforeCheck: 30s
+        resolvers:
+          - "1.1.1.1:53"
+          - "8.8.8.8:53"
+      # Fallback HTTP challenge for testing
+      # httpChallenge:
+      #   entryPoint: web
+  
+  letsencrypt-staging:
+    acme:
+      email: admin@example.com  # Change this to your email
+      storage: /data/acme-staging.json
+      caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+      dnsChallenge:
+        provider: rfc2136
+        delayBeforeCheck: 30s
+        resolvers:
+          - "1.1.1.1:53"
+          - "8.8.8.8:53"
+
+# Logging
+log:
+  level: INFO
+  filePath: "/logs/traefik.log"
+
+accessLog:
+  filePath: "/logs/access.log"
+
+# HTTP to HTTPS redirect
+serversTransport:
+  insecureSkipVerify: true  # For internal services with self-signed certs

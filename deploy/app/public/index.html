@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traefik UI</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Traefik Configuration Manager</h1>
+            <div class="header-controls">
+                <button id="theme-toggle" class="btn btn-secondary" title="Toggle theme">🌓</button>
+                <button id="refresh-btn" class="btn btn-secondary">Refresh Config</button>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="overview">Overview</button>
+            <button class="tab-btn" data-tab="add-route">Add Route</button>
+            <button class="tab-btn" data-tab="middleware">Middleware</button>
+            <button class="tab-btn" data-tab="templates">Templates</button>
+        </div>
+
+        <div id="overview" class="tab-content active">
+            <div class="section">
+                <h2>Current Routes</h2>
+                <div id="routes-list" class="routes-container">
+                    <p>Loading...</p>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Services</h2>
+                <div id="services-list" class="services-container">
+                    <p>Loading...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="add-route" class="tab-content">
+            <div class="section">
+                <h2>Add New Route</h2>
+                <form id="route-form" class="form">
+                    <div class="form-group">
+                        <label for="route-name">Route Name:</label>
+                        <input type="text" id="route-name" required placeholder="e.g., my-app">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="hostname">Hostname:</label>
+                        <input type="text" id="hostname" required placeholder="e.g., app.example.com">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="backend-url">Backend URL:</label>
+                        <input type="text" id="backend-url" required placeholder="e.g., http://192.168.1.100:8080">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enable-tls"> Enable TLS/HTTPS
+                        </label>
+                    </div>
+                    
+                    <div id="tls-options" class="form-group hidden">
+                        <label for="tls-method">TLS Method:</label>
+                        <select id="tls-method">
+                            <option value="letsencrypt">Let's Encrypt (Production)</option>
+                            <option value="letsencrypt-staging">Let's Encrypt (Staging)</option>
+                            <option value="custom">Custom Certificate</option>
+                        </select>
+                    </div>
+                    
+                    <div id="custom-cert-options" class="form-group hidden">
+                        <div class="cert-instructions">
+                            <h4>Custom Certificate Requirements</h4>
+                            <p><strong>Certificate Chain Order:</strong></p>
+                            <ol>
+                                <li><strong>Server Certificate</strong> (your domain certificate)</li>
+                                <li><strong>Intermediate Certificate(s)</strong> (if any, from your CA)</li>
+                                <li><strong>Root Certificate</strong> (optional, usually not needed)</li>
+                            </ol>
+                            <p><strong>Format:</strong> PEM format (Base64 encoded, wrapped in -----BEGIN/END----- lines)</p>
+                            <p><strong>Note:</strong> Paste certificates one after another without blank lines between them.</p>
+                        </div>
+                        
+                        <label for="cert-chain">Certificate Chain:</label>
+                        <textarea id="cert-chain" rows="15" placeholder="-----BEGIN CERTIFICATE-----
+MIIFXzCCBEegAwIBAgIQB...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIIGFTCCBP2gAwIBAgIQD...
+-----END CERTIFICATE-----"></textarea>
+                        
+                        <label for="private-key">Private Key:</label>
+                        <textarea id="private-key" rows="10" placeholder="-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...
+-----END PRIVATE KEY-----"></textarea>
+                        
+                        <div class="cert-validation">
+                            <small>⚠️ Ensure your private key matches the certificate and is not password protected.</small>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="ignore-tls-errors"> Ignore Backend TLS Errors
+                        </label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enable-crowdsec"> Enable CrowdSec Protection
+                        </label>
+                    </div>
+                    
+                    <div id="middleware-options" class="form-group hidden">
+                        <label for="middleware-select">Available Middleware:</label>
+                        <select id="middleware-select" multiple>
+                            <!-- Populated dynamically -->
+                        </select>
+                        <small>Hold Ctrl/Cmd to select multiple middleware</small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Add Route</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="middleware" class="tab-content">
+            <div class="section">
+                <h2>Current Middleware</h2>
+                <div id="middleware-list" class="middleware-container">
+                    <p>Loading...</p>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Add CrowdSec Middleware</h2>
+                <form id="crowdsec-form" class="form">
+                    <div class="form-group">
+                        <label for="middleware-name">Middleware Name:</label>
+                        <input type="text" id="middleware-name" required placeholder="e.g., crowdsec-bouncer">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="middleware-enabled" checked> Enable CrowdSec Protection
+                        </label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="crowdsec-mode">CrowdSec Mode:</label>
+                        <select id="crowdsec-mode">
+                            <option value="stream">Stream (Recommended)</option>
+                            <option value="live">Live</option>
+                            <option value="alone">Alone</option>
+                            <option value="none">None</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="lapi-url">Local API URL:</label>
+                        <input type="text" id="lapi-url" placeholder="http://crowdsec:8080" value="http://crowdsec:8080">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="lapi-key">Local API Key:</label>
+                        <input type="text" id="lapi-key" required placeholder="Your CrowdSec LAPI key">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="appsec-enabled"> Enable AppSec (WAF)
+                        </label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="trusted-ips">Trusted IPs (comma-separated):</label>
+                        <input type="text" id="trusted-ips" placeholder="10.0.0.0/8, 192.168.0.0/16">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Add CrowdSec Middleware</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="templates" class="tab-content">
+            <div class="section">
+                <h2>Quick Templates</h2>
+                <div class="templates-grid">
+                    <div class="template-card" data-template="simple-http">
+                        <h3>Simple HTTP Service</h3>
+                        <p>Basic HTTP service without TLS</p>
+                        <button class="btn btn-secondary">Use Template</button>
+                    </div>
+                    
+                    <div class="template-card" data-template="https-letsencrypt">
+                        <h3>HTTPS with Let's Encrypt</h3>
+                        <p>Production certificates via DNS challenge</p>
+                        <button class="btn btn-secondary">Use Template</button>
+                    </div>
+                    
+                    <div class="template-card" data-template="https-staging">
+                        <h3>HTTPS Staging</h3>
+                        <p>Test certificates via DNS challenge</p>
+                        <button class="btn btn-secondary">Use Template</button>
+                    </div>
+                    
+                    <div class="template-card" data-template="internal-service">
+                        <h3>Internal Service</h3>
+                        <p>Internal service that ignores TLS errors</p>
+                        <button class="btn btn-secondary">Use Template</button>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button id="restart-traefik" class="btn btn-warning">Restart Traefik</button>
+        </div>
+    </div>
+
+    <div id="notification" class="notification hidden"></div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
