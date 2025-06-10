@@ -15,6 +15,7 @@ services:
       - ./config/dynamic.yml:/dynamic.yml:rw
       - ./data:/data
       - ./logs:/logs
+      - ./certs:/certs:ro
     environment:
       - TRAEFIK_LOG_LEVEL=INFO
       # RFC2136 DNS Challenge Configuration
@@ -45,6 +46,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./config:/config:ro
+      - ./certs:/app/certs
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
       - "3000:3000"

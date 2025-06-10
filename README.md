@@ -1,6 +1,6 @@
 # Traefik UI
 
-**Version 0.0.2**
+**Version 0.0.3**
 
 A simple web interface for managing Traefik proxy configurations without manually editing config files.
 
@@ -13,7 +13,7 @@ A simple web interface for managing Traefik proxy configurations without manuall
 - **Form-Based Route Creation**: Easy forms to add new proxy routes with middleware selection
 - **Enhanced TSIG Support**: Multiple algorithm support for RFC2136 DNS challenges
 - **Middleware Management**: Create, configure, and assign CrowdSec protection to routes
-- **TLS Configuration**: Support for Let's Encrypt production/staging and custom certificates
+- **TLS Configuration**: Support for Let's Encrypt production/staging and custom certificate upload
 - **Service Management**: Automatically create backend services when adding routes
 - **Restart Integration**: Restart Traefik directly from the UI
 
@@ -123,6 +123,25 @@ For automatic SSL certificates via DNS challenge:
    # Choose the appropriate algorithm for your DNS server
    RFC2136_TSIG_ALGORITHM=hmac-sha256  # or hmac-md5, hmac-sha1, etc.
    ```
+
+## Custom Certificates
+
+1. **Certificate Chain Format:**
+   - Server certificate (your domain)
+   - Intermediate certificate(s) from CA
+   - Root certificate (optional)
+   - Must be in PEM format with -----BEGIN/END----- markers
+
+2. **Private Key Requirements:**
+   - Must match the certificate
+   - PEM format without password protection
+   - RSA or ECDSA keys supported
+
+3. **Upload Process:**
+   - Select "Custom Certificate" in TLS method
+   - Paste certificate chain in order
+   - Paste matching private key
+   - Certificates are automatically stored and configured
 
 ## Templates
 

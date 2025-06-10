@@ -41,6 +41,7 @@ class TraefikUI {
         document.getElementById('route-form').addEventListener('submit', (e) => this.handleRouteSubmit(e));
         document.getElementById('crowdsec-form').addEventListener('submit', (e) => this.handleCrowdSecSubmit(e));
         document.getElementById('enable-tls').addEventListener('change', (e) => this.toggleTLSOptions(e.target.checked));
+        document.getElementById('tls-method').addEventListener('change', (e) => this.toggleCustomCertOptions(e.target.value));
         document.getElementById('enable-crowdsec').addEventListener('change', (e) => this.toggleMiddlewareOptions(e.target.checked));
         document.getElementById('restart-traefik').addEventListener('click', () => this.restartTraefik());
 
@@ -63,6 +64,15 @@ class TraefikUI {
             tlsOptions.classList.remove('hidden');
         } else {
             tlsOptions.classList.add('hidden');
+        }
+    }
+
+    toggleCustomCertOptions(tlsMethod) {
+        const customCertOptions = document.getElementById('custom-cert-options');
+        if (tlsMethod === 'custom') {
+            customCertOptions.classList.remove('hidden');
+        } else {
+            customCertOptions.classList.add('hidden');
         }
     }
 
@@ -165,6 +175,8 @@ class TraefikUI {
         const tlsMethod = document.getElementById('tls-method').value;
         const ignoreTlsErrors = document.getElementById('ignore-tls-errors').checked;
         const enableCrowdSec = document.getElementById('enable-crowdsec').checked;
+        const certChain = document.getElementById('cert-chain').value;
+        const privateKey = document.getElementById('private-key').value;
 
         const serviceName = `${routeName}-service`;
         
@@ -175,8 +187,7 @@ class TraefikUI {
                 name: routeName,
                 rule: `Host(\`${hostname}\`)`,
                 service: serviceName,
-                tls: enableTls ? (tlsMethod === 'letsencrypt' ? { certResolver: 'letsencrypt' } : 
-                                tlsMethod === 'letsencrypt-staging' ? { certResolver: 'letsencrypt-staging' } : {}) : null
+                tls: enableTls ? this.buildTlsConfig(tlsMethod, certChain, privateKey, hostname) : null
             };
 
             // Add middleware if selected
@@ -188,6 +199,11 @@ class TraefikUI {
                 }
             }
 
+            // Handle custom certificate if needed
+            if (enableTls && tlsMethod === 'custom') {
+                await this.storeCertificate(hostname, certChain, privateKey);
+            }
+
             await this.createRoute(routeConfig);
             
             this.showNotification('Route created successfully!', 'success');
@@ -196,6 +212,43 @@ class TraefikUI {
             
         } catch (error) {
             this.showNotification('Failed to create route', 'error');
+        }
+    }
+
+    buildTlsConfig(tlsMethod, certChain, privateKey, hostname) {
+        switch (tlsMethod) {
+            case 'letsencrypt':
+                return { certResolver: 'letsencrypt' };
+            case 'letsencrypt-staging':
+                return { certResolver: 'letsencrypt-staging' };
+            case 'custom':
+                if (!certChain || !privateKey) {
+                    throw new Error('Certificate chain and private key are required for custom certificates');
+                }
+                return { 
+                    domains: [{ main: hostname }],
+                    options: 'default'
+                };
+            default:
+                return {};
+        }
+    }
+
+    async storeCertificate(hostname, certChain, privateKey) {
+        const certData = {
+            hostname,
+            certChain: certChain.trim(),
+            privateKey: privateKey.trim()
+        };
+
+        const response = await fetch('/api/certificate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(certData)
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to store certificate');
         }
     }
 

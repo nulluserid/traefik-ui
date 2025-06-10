@@ -200,6 +200,99 @@ app.delete('/api/middleware/:name', (req, res) => {
   }
 });
 
+// Custom certificate management
+app.post('/api/certificate', (req, res) => {
+  try {
+    const { hostname, certChain, privateKey } = req.body;
+    
+    // Validate certificate format
+    if (!certChain.includes('-----BEGIN CERTIFICATE-----') || !certChain.includes('-----END CERTIFICATE-----')) {
+      return res.status(400).json({ error: 'Invalid certificate format. Must be PEM format.' });
+    }
+    
+    if (!privateKey.includes('-----BEGIN PRIVATE KEY-----') || !privateKey.includes('-----END PRIVATE KEY-----')) {
+      return res.status(400).json({ error: 'Invalid private key format. Must be PEM format.' });
+    }
+    
+    // Create certificates directory if it doesn't exist
+    const certsDir = path.join(__dirname, 'certs');
+    if (!fs.existsSync(certsDir)) {
+      fs.mkdirSync(certsDir, { recursive: true });
+    }
+    
+    // Write certificate files (paths for Traefik container)
+    const certPath = `/certs/${hostname}.crt`;
+    const keyPath = `/certs/${hostname}.key`;
+    
+    // Write to actual filesystem  
+    fs.writeFileSync(path.join(certsDir, `${hostname}.crt`), certChain);
+    fs.writeFileSync(path.join(certsDir, `${hostname}.key`), privateKey);
+    
+    // Update dynamic configuration with certificate store
+    let config = {};
+    if (fs.existsSync(DYNAMIC_CONFIG_PATH)) {
+      config = yaml.load(fs.readFileSync(DYNAMIC_CONFIG_PATH, 'utf8'));
+    }
+    
+    if (!config.tls) config.tls = {};
+    if (!config.tls.stores) config.tls.stores = {};
+    if (!config.tls.stores.default) config.tls.stores.default = {};
+    if (!config.tls.certificates) config.tls.certificates = [];
+    
+    // Add certificate to the certificates array
+    const existingCertIndex = config.tls.certificates.findIndex(cert => 
+      cert.certFile && cert.certFile.includes(hostname)
+    );
+    
+    const newCert = {
+      certFile: certPath,
+      keyFile: keyPath
+    };
+    
+    if (existingCertIndex >= 0) {
+      config.tls.certificates[existingCertIndex] = newCert;
+    } else {
+      config.tls.certificates.push(newCert);
+    }
+    
+    fs.writeFileSync(DYNAMIC_CONFIG_PATH, yaml.dump(config));
+    res.json({ success: true, message: 'Certificate stored successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/certificate/:hostname', (req, res) => {
+  try {
+    const { hostname } = req.params;
+    
+    // Remove certificate files
+    const certsDir = path.join(__dirname, 'certs');
+    const certPath = path.join(certsDir, `${hostname}.crt`);
+    const keyPath = path.join(certsDir, `${hostname}.key`);
+    
+    if (fs.existsSync(certPath)) fs.unlinkSync(certPath);
+    if (fs.existsSync(keyPath)) fs.unlinkSync(keyPath);
+    
+    // Update dynamic configuration
+    if (fs.existsSync(DYNAMIC_CONFIG_PATH)) {
+      const config = yaml.load(fs.readFileSync(DYNAMIC_CONFIG_PATH, 'utf8'));
+      
+      if (config.tls && config.tls.certificates) {
+        config.tls.certificates = config.tls.certificates.filter(cert => 
+          !cert.certFile || !cert.certFile.includes(hostname)
+        );
+        
+        fs.writeFileSync(DYNAMIC_CONFIG_PATH, yaml.dump(config));
+      }
+    }
+    
+    res.json({ success: true, message: 'Certificate deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Traefik UI running on http://localhost:${PORT}`);
 });

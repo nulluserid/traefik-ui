@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.3] - 2025-06-09
+
+### Added
+- **Custom Certificate Support**: Complete implementation for custom SSL certificates
+  - Certificate chain upload with detailed format instructions
+  - Private key upload with validation
+  - PEM format validation and error handling
+  - Certificate file storage and Traefik dynamic configuration integration
+  - Visual instructions explaining certificate chain order and format requirements
+- **Enhanced TLS Configuration**: Dynamic form fields based on TLS method selection
+  - Custom certificate form appears only when "Custom Certificate" is selected
+  - Monospace textarea styling for better certificate readability
+  - Certificate validation warnings and format guidance
+
+### Enhanced  
+- **Form UI Improvements**: Better user experience for certificate management
+  - Clear step-by-step instructions for certificate chain ordering
+  - Format examples in placeholder text
+  - Warning messages for common certificate issues
+- **API Endpoints**: New certificate management endpoints
+  - POST /api/certificate for uploading custom certificates
+  - DELETE /api/certificate/:hostname for removing certificates
+  - Certificate format validation and error responses
+
+### Technical Details
+- Certificate storage in dedicated `/certs` directory
+- Dynamic Traefik configuration updates for custom certificates
+- Docker volume mounts for certificate sharing between containers
+- PEM format validation for both certificates and private keys
+- Automatic certificate cleanup when routes are deleted
+
 ## [0.0.2] - 2025-06-09
 
 ### Added

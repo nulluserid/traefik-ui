@@ -73,6 +73,37 @@
                         </select>
                     </div>
                     
+                    <div id="custom-cert-options" class="form-group hidden">
+                        <div class="cert-instructions">
+                            <h4>Custom Certificate Requirements</h4>
+                            <p><strong>Certificate Chain Order:</strong></p>
+                            <ol>
+                                <li><strong>Server Certificate</strong> (your domain certificate)</li>
+                                <li><strong>Intermediate Certificate(s)</strong> (if any, from your CA)</li>
+                                <li><strong>Root Certificate</strong> (optional, usually not needed)</li>
+                            </ol>
+                            <p><strong>Format:</strong> PEM format (Base64 encoded, wrapped in -----BEGIN/END----- lines)</p>
+                            <p><strong>Note:</strong> Paste certificates one after another without blank lines between them.</p>
+                        </div>
+                        
+                        <label for="cert-chain">Certificate Chain:</label>
+                        <textarea id="cert-chain" rows="15" placeholder="-----BEGIN CERTIFICATE-----
+MIIFXzCCBEegAwIBAgIQB...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+MIIGFTCCBP2gAwIBAgIQD...
+-----END CERTIFICATE-----"></textarea>
+                        
+                        <label for="private-key">Private Key:</label>
+                        <textarea id="private-key" rows="10" placeholder="-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...
+-----END PRIVATE KEY-----"></textarea>
+                        
+                        <div class="cert-validation">
+                            <small>⚠️ Ensure your private key matches the certificate and is not password protected.</small>
+                        </div>
+                    </div>
+                    
                     <div class="form-group">
                         <label>
                             <input type="checkbox" id="ignore-tls-errors"> Ignore Backend TLS Errors
