@@ -85,6 +85,12 @@ class TraefikUI {
         document.getElementById('tracing-backend').addEventListener('change', (e) => this.handleTracingBackendChange(e.target.value));
         document.getElementById('sampling-rate').addEventListener('input', (e) => this.updateSamplingRateDisplay(e.target.value));
         
+        // Observability Preset Event Listeners
+        document.getElementById('apply-production-preset').addEventListener('click', () => this.applyObservabilityPreset('production'));
+        document.getElementById('apply-development-preset').addEventListener('click', () => this.applyObservabilityPreset('development'));
+        document.getElementById('apply-minimal-preset').addEventListener('click', () => this.applyObservabilityPreset('minimal'));
+        document.getElementById('apply-custom-preset').addEventListener('click', () => this.applyObservabilityPreset('custom'));
+        
         document.getElementById('access-logs-form').addEventListener('submit', (e) => this.handleAccessLogsSubmit(e));
         document.getElementById('metrics-form').addEventListener('submit', (e) => this.handleMetricsSubmit(e));
         document.getElementById('tracing-form').addEventListener('submit', (e) => this.handleTracingSubmit(e));
@@ -2200,6 +2206,91 @@ scrape_timeout: 10s`;
             }
         } catch (error) {
             this.showNotification('Failed to restart Traefik', 'error');
+        }
+    }
+
+    async applyObservabilityPreset(presetName) {
+        if (presetName === 'custom') {
+            this.showNotification('Custom mode activated. Configure each section manually below.', 'info');
+            return;
+        }
+
+        try {
+            // Load UI configuration to get presets
+            const configResponse = await fetch('/api/config/ui');
+            const config = await configResponse.json();
+            
+            const preset = config.traefik_ui.observability.presets[presetName];
+            if (!preset) {
+                throw new Error(`Preset '${presetName}' not found`);
+            }
+
+            const applyPromises = [];
+
+            // Apply access logs configuration
+            if (preset.access_logs !== undefined) {
+                applyPromises.push(this.applyPresetAccessLogs(preset.access_logs));
+            }
+
+            // Apply metrics configuration
+            if (preset.metrics !== undefined) {
+                applyPromises.push(this.applyPresetMetrics(preset.metrics));
+            }
+
+            // Apply tracing configuration
+            if (preset.tracing !== undefined) {
+                applyPromises.push(this.applyPresetTracing(preset.tracing));
+            }
+
+            // Apply all configurations in parallel
+            await Promise.all(applyPromises);
+
+            // Update the UI forms to reflect the applied preset
+            await this.loadObservabilityConfig();
+
+            this.showNotification(`${presetName.charAt(0).toUpperCase() + presetName.slice(1)} preset applied successfully!`, 'success');
+        } catch (error) {
+            console.error('Preset application error:', error);
+            this.showNotification(`Failed to apply ${presetName} preset: ${error.message}`, 'error');
+        }
+    }
+
+    async applyPresetAccessLogs(config) {
+        const response = await fetch('/api/observability/logs', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to apply access logs configuration');
+        }
+    }
+
+    async applyPresetMetrics(config) {
+        const response = await fetch('/api/observability/metrics', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to apply metrics configuration');
+        }
+    }
+
+    async applyPresetTracing(config) {
+        const response = await fetch('/api/observability/tracing', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to apply tracing configuration');
         }
     }
 

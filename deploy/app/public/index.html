@@ -370,6 +370,30 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...
             <div class="section">
                 <h2>Observability Configuration</h2>
                 <p>Configure Traefik's logging, metrics, and tracing capabilities for comprehensive monitoring and observability.</p>
+                
+                <div class="observability-presets">
+                    <h3>🚀 Quick Configuration Presets</h3>
+                    <div class="preset-buttons">
+                        <button id="apply-production-preset" class="btn btn-primary">🏭 Production</button>
+                        <button id="apply-development-preset" class="btn btn-secondary">🔧 Development</button>
+                        <button id="apply-minimal-preset" class="btn btn-secondary">📦 Minimal</button>
+                        <button id="apply-custom-preset" class="btn btn-secondary">⚙️ Custom</button>
+                    </div>
+                    <div class="preset-descriptions">
+                        <div class="preset-desc" data-preset="production">
+                            <strong>Production:</strong> JSON logs + full metrics + Jaeger tracing (10% sampling)
+                        </div>
+                        <div class="preset-desc" data-preset="development">
+                            <strong>Development:</strong> CLF logs + basic metrics + no tracing
+                        </div>
+                        <div class="preset-desc" data-preset="minimal">
+                            <strong>Minimal:</strong> All observability disabled for minimal overhead
+                        </div>
+                        <div class="preset-desc" data-preset="custom">
+                            <strong>Custom:</strong> Manual configuration using the forms below
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <div class="section">
