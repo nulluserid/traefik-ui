@@ -21,6 +21,7 @@
             <button class="tab-btn" data-tab="add-route">Add Route</button>
             <button class="tab-btn" data-tab="middleware">Middleware</button>
             <button class="tab-btn" data-tab="dns-providers">DNS Providers</button>
+            <button class="tab-btn" data-tab="label-generator">Label Generator</button>
             <button class="tab-btn" data-tab="templates">Templates</button>
         </div>
 
@@ -308,6 +309,135 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...
                     
                     <button type="submit" class="btn btn-primary">Add DNS Provider</button>
                 </form>
+            </div>
+        </div>
+
+        <div id="label-generator" class="tab-content">
+            <div class="section">
+                <h2>Docker Label Generator</h2>
+                <p>Generate Traefik labels for your Docker Compose services. This allows services to self-configure when deployed.</p>
+                
+                <form id="label-generator-form" class="form">
+                    <div class="form-group">
+                        <label for="label-service-name">Service Name:</label>
+                        <input type="text" id="label-service-name" required placeholder="e.g., my-app, api, frontend">
+                        <small>Used for router and service names in Traefik configuration</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="label-hostname">Hostname/Domain:</label>
+                        <input type="text" id="label-hostname" required placeholder="e.g., app.example.com, api.mysite.org">
+                        <small>The domain name that will route to this service</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="label-port">Service Port:</label>
+                        <input type="number" id="label-port" placeholder="3000">
+                        <small>Internal container port (optional, Traefik will auto-detect if only one port)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="label-path">Path (optional):</label>
+                        <input type="text" id="label-path" placeholder="/api, /app">
+                        <small>URL path prefix (leave empty for domain root)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="label-enable-tls"> Enable TLS/HTTPS
+                        </label>
+                    </div>
+                    
+                    <div id="label-tls-options" class="form-group hidden">
+                        <label for="label-tls-method">TLS Method:</label>
+                        <select id="label-tls-method">
+                            <option value="letsencrypt-http">Let's Encrypt (HTTP Challenge)</option>
+                            <option value="letsencrypt-dns">Let's Encrypt (DNS Challenge)</option>
+                            <option value="letsencrypt-staging-http">Let's Encrypt Staging (HTTP Challenge)</option>
+                            <option value="letsencrypt-staging-dns">Let's Encrypt Staging (DNS Challenge)</option>
+                            <option value="custom">Custom Certificate</option>
+                        </select>
+                    </div>
+                    
+                    <div id="label-dns-provider-options" class="form-group hidden">
+                        <label for="label-dns-provider">DNS Provider:</label>
+                        <select id="label-dns-provider">
+                            <option value="">Select DNS Provider...</option>
+                            <!-- Populated dynamically from saved providers -->
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="label-enable-crowdsec"> Enable CrowdSec Protection
+                        </label>
+                    </div>
+                    
+                    <div id="label-middleware-options" class="form-group hidden">
+                        <label for="label-middleware-select">Additional Middleware:</label>
+                        <select id="label-middleware-select" multiple>
+                            <!-- Populated dynamically -->
+                        </select>
+                        <small>Hold Ctrl/Cmd to select multiple middleware</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="label-ignore-tls-errors"> Ignore Backend TLS Errors
+                        </label>
+                        <small>Enable for services with self-signed certificates</small>
+                    </div>
+                    
+                    <button type="button" id="generate-labels" class="btn btn-primary">Generate Labels</button>
+                </form>
+            </div>
+            
+            <div id="generated-labels-section" class="section hidden">
+                <h2>Generated Docker Labels</h2>
+                <div class="label-output-container">
+                    <div class="label-output-header">
+                        <h3>Add these labels to your docker-compose.yml:</h3>
+                        <button id="copy-labels" class="btn btn-secondary">📋 Copy to Clipboard</button>
+                    </div>
+                    
+                    <div class="label-code-container">
+                        <pre id="generated-labels-output" class="label-code"></pre>
+                    </div>
+                    
+                    <div class="label-usage-example">
+                        <h4>Example docker-compose.yml usage:</h4>
+                        <pre class="label-code" id="compose-example"></pre>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Label Templates</h2>
+                <div class="label-templates-grid">
+                    <div class="label-template-card" data-template="simple-web-app">
+                        <h3>Simple Web App</h3>
+                        <p>Basic web application with Let's Encrypt SSL</p>
+                        <button class="btn btn-secondary">Use Template</button>
+                    </div>
+                    
+                    <div class="label-template-card" data-template="api-service">
+                        <h3>API Service</h3>
+                        <p>REST API with path routing and CORS</p>
+                        <button class="btn btn-secondary">Use Template</button>
+                    </div>
+                    
+                    <div class="label-template-card" data-template="protected-service">
+                        <h3>Protected Service</h3>
+                        <p>Service with CrowdSec protection enabled</p>
+                        <button class="btn btn-secondary">Use Template</button>
+                    </div>
+                    
+                    <div class="label-template-card" data-template="development-service">
+                        <h3>Development Service</h3>
+                        <p>Local development with HTTP and TLS bypass</p>
+                        <button class="btn btn-secondary">Use Template</button>
+                    </div>
+                </div>
             </div>
         </div>
 

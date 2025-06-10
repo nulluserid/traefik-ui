@@ -9,6 +9,7 @@ class TraefikUI {
         this.loadConfig();
         this.loadMiddleware();
         this.loadDNSProviders();
+        this.populateLabelGeneratorDropdowns();
     }
 
     initTheme() {
@@ -47,8 +48,19 @@ class TraefikUI {
         document.getElementById('enable-crowdsec').addEventListener('change', (e) => this.toggleMiddlewareOptions(e.target.checked));
         document.getElementById('restart-traefik').addEventListener('click', () => this.restartTraefik());
 
+        // Label Generator Event Listeners
+        document.getElementById('label-enable-tls').addEventListener('change', (e) => this.toggleLabelTLSOptions(e.target.checked));
+        document.getElementById('label-tls-method').addEventListener('change', (e) => this.handleLabelTLSMethodChange(e.target.value));
+        document.getElementById('label-enable-crowdsec').addEventListener('change', (e) => this.toggleLabelMiddlewareOptions(e.target.checked));
+        document.getElementById('generate-labels').addEventListener('click', () => this.generateLabels());
+        document.getElementById('copy-labels').addEventListener('click', () => this.copyLabelsToClipboard());
+
         document.querySelectorAll('.template-card').forEach(card => {
             card.addEventListener('click', () => this.useTemplate(card.dataset.template));
+        });
+
+        document.querySelectorAll('.label-template-card').forEach(card => {
+            card.addEventListener('click', () => this.useLabelTemplate(card.dataset.template));
         });
     }
 
@@ -658,6 +670,294 @@ class TraefikUI {
         } catch (error) {
             this.showNotification(`DNS provider test failed: ${error.message}`, 'error');
         }
+    }
+
+    // Label Generator Methods
+    toggleLabelTLSOptions(enabled) {
+        const tlsOptions = document.getElementById('label-tls-options');
+        if (enabled) {
+            tlsOptions.classList.remove('hidden');
+            this.handleLabelTLSMethodChange(document.getElementById('label-tls-method').value);
+        } else {
+            tlsOptions.classList.add('hidden');
+            document.getElementById('label-dns-provider-options').classList.add('hidden');
+        }
+    }
+
+    handleLabelTLSMethodChange(tlsMethod) {
+        const dnsProviderOptions = document.getElementById('label-dns-provider-options');
+        
+        // Show DNS provider selection for DNS challenges
+        if (tlsMethod === 'letsencrypt-dns' || tlsMethod === 'letsencrypt-staging-dns') {
+            dnsProviderOptions.classList.remove('hidden');
+        } else {
+            dnsProviderOptions.classList.add('hidden');
+        }
+    }
+
+    toggleLabelMiddlewareOptions(enabled) {
+        const middlewareOptions = document.getElementById('label-middleware-options');
+        if (enabled) {
+            middlewareOptions.classList.remove('hidden');
+        } else {
+            middlewareOptions.classList.add('hidden');
+        }
+    }
+
+    async populateLabelGeneratorDropdowns() {
+        // Populate DNS providers
+        try {
+            const response = await fetch('/api/dns-providers');
+            const providers = await response.json();
+            const select = document.getElementById('label-dns-provider');
+            
+            // Clear existing options except the first one
+            select.innerHTML = '<option value="">Select DNS Provider...</option>';
+            
+            providers.forEach(provider => {
+                const option = document.createElement('option');
+                option.value = provider.name;
+                option.textContent = `${provider.name} (${provider.config.nameserver})`;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Failed to load DNS providers for label generator:', error);
+        }
+
+        // Populate middleware
+        try {
+            const response = await fetch('/api/middleware');
+            const middleware = await response.json();
+            const select = document.getElementById('label-middleware-select');
+            
+            select.innerHTML = '';
+            middleware.forEach(mw => {
+                const option = document.createElement('option');
+                option.value = mw.name;
+                option.textContent = mw.name;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Failed to load middleware for label generator:', error);
+        }
+    }
+
+    generateLabels() {
+        const serviceName = document.getElementById('label-service-name').value.trim();
+        const hostname = document.getElementById('label-hostname').value.trim();
+        const port = document.getElementById('label-port').value.trim();
+        const path = document.getElementById('label-path').value.trim();
+        const enableTls = document.getElementById('label-enable-tls').checked;
+        const tlsMethod = document.getElementById('label-tls-method').value;
+        const dnsProvider = document.getElementById('label-dns-provider').value;
+        const enableCrowdSec = document.getElementById('label-enable-crowdsec').checked;
+        const additionalMiddleware = Array.from(document.getElementById('label-middleware-select').selectedOptions).map(option => option.value);
+        const ignoreTlsErrors = document.getElementById('label-ignore-tls-errors').checked;
+
+        if (!serviceName || !hostname) {
+            this.showNotification('Service name and hostname are required', 'error');
+            return;
+        }
+
+        const labels = this.buildTraefikLabels({
+            serviceName,
+            hostname,
+            port,
+            path,
+            enableTls,
+            tlsMethod,
+            dnsProvider,
+            enableCrowdSec,
+            additionalMiddleware,
+            ignoreTlsErrors
+        });
+
+        this.displayGeneratedLabels(labels, serviceName);
+    }
+
+    buildTraefikLabels(config) {
+        const labels = [];
+        const { serviceName, hostname, port, path, enableTls, tlsMethod, dnsProvider, enableCrowdSec, additionalMiddleware, ignoreTlsErrors } = config;
+
+        // Basic labels
+        labels.push(`"traefik.enable=true"`);
+
+        // Build rule
+        let rule = `Host(\`${hostname}\`)`;
+        if (path) {
+            rule += ` && PathPrefix(\`${path}\`)`;
+        }
+        labels.push(`"traefik.http.routers.${serviceName}.rule=${rule}"`);
+
+        // Set entrypoint
+        if (enableTls) {
+            labels.push(`"traefik.http.routers.${serviceName}.entrypoints=websecure"`);
+            labels.push(`"traefik.http.routers.${serviceName}.tls=true"`);
+
+            // TLS configuration
+            if (tlsMethod === 'letsencrypt-http') {
+                labels.push(`"traefik.http.routers.${serviceName}.tls.certresolver=letsencrypt"`);
+            } else if (tlsMethod === 'letsencrypt-dns') {
+                labels.push(`"traefik.http.routers.${serviceName}.tls.certresolver=letsencrypt-dns"`);
+            } else if (tlsMethod === 'letsencrypt-staging-http') {
+                labels.push(`"traefik.http.routers.${serviceName}.tls.certresolver=letsencrypt-staging"`);
+            } else if (tlsMethod === 'letsencrypt-staging-dns') {
+                labels.push(`"traefik.http.routers.${serviceName}.tls.certresolver=letsencrypt-staging-dns"`);
+            }
+        } else {
+            labels.push(`"traefik.http.routers.${serviceName}.entrypoints=web"`);
+        }
+
+        // Service configuration
+        if (port) {
+            labels.push(`"traefik.http.services.${serviceName}.loadbalancer.server.port=${port}"`);
+        }
+
+        // Middleware
+        const middleware = [];
+        if (enableCrowdSec) {
+            middleware.push('crowdsec-bouncer');
+        }
+        if (additionalMiddleware.length > 0) {
+            middleware.push(...additionalMiddleware);
+        }
+        if (middleware.length > 0) {
+            labels.push(`"traefik.http.routers.${serviceName}.middlewares=${middleware.join(',')}"`);
+        }
+
+        // Backend TLS settings
+        if (ignoreTlsErrors) {
+            labels.push(`"traefik.http.services.${serviceName}.loadbalancer.serverstransport=insecureTransport"`);
+        }
+
+        return labels;
+    }
+
+    displayGeneratedLabels(labels, serviceName) {
+        const labelsOutput = document.getElementById('generated-labels-output');
+        const composeExample = document.getElementById('compose-example');
+        const section = document.getElementById('generated-labels-section');
+
+        // Display labels
+        const labelText = labels.map(label => `      - ${label}`).join('\n');
+        labelsOutput.textContent = labelText;
+
+        // Display compose example
+        const composeText = `version: '3.8'
+
+services:
+  ${serviceName}:
+    image: your-app-image:latest
+    labels:
+${labelText}
+    networks:
+      - traefik
+
+networks:
+  traefik:
+    external: true`;
+        
+        composeExample.textContent = composeText;
+
+        // Show the section
+        section.classList.remove('hidden');
+        section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    async copyLabelsToClipboard() {
+        const labelsText = document.getElementById('generated-labels-output').textContent;
+        const copyButton = document.getElementById('copy-labels');
+
+        try {
+            await navigator.clipboard.writeText(labelsText);
+            
+            // Visual feedback
+            const originalText = copyButton.textContent;
+            copyButton.classList.add('copied');
+            copyButton.textContent = 'Copied!';
+            
+            setTimeout(() => {
+                copyButton.classList.remove('copied');
+                copyButton.textContent = originalText;
+            }, 2000);
+            
+            this.showNotification('Labels copied to clipboard!', 'success');
+        } catch (error) {
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = labelsText;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            
+            this.showNotification('Labels copied to clipboard!', 'success');
+        }
+    }
+
+    useLabelTemplate(templateType) {
+        const templates = {
+            'simple-web-app': {
+                serviceName: 'my-app',
+                hostname: 'app.example.com',
+                port: '3000',
+                path: '',
+                enableTls: true,
+                tlsMethod: 'letsencrypt-dns',
+                enableCrowdSec: false,
+                ignoreTlsErrors: false
+            },
+            'api-service': {
+                serviceName: 'api',
+                hostname: 'api.example.com',
+                port: '8080',
+                path: '/api',
+                enableTls: true,
+                tlsMethod: 'letsencrypt-dns',
+                enableCrowdSec: false,
+                ignoreTlsErrors: false
+            },
+            'protected-service': {
+                serviceName: 'secure-app',
+                hostname: 'secure.example.com',
+                port: '3000',
+                path: '',
+                enableTls: true,
+                tlsMethod: 'letsencrypt-dns',
+                enableCrowdSec: true,
+                ignoreTlsErrors: false
+            },
+            'development-service': {
+                serviceName: 'dev-app',
+                hostname: 'dev.localhost',
+                port: '3000',
+                path: '',
+                enableTls: false,
+                tlsMethod: 'letsencrypt-http',
+                enableCrowdSec: false,
+                ignoreTlsErrors: true
+            }
+        };
+
+        const template = templates[templateType];
+        if (!template) return;
+
+        // Fill form fields
+        document.getElementById('label-service-name').value = template.serviceName;
+        document.getElementById('label-hostname').value = template.hostname;
+        document.getElementById('label-port').value = template.port;
+        document.getElementById('label-path').value = template.path;
+        document.getElementById('label-enable-tls').checked = template.enableTls;
+        document.getElementById('label-tls-method').value = template.tlsMethod;
+        document.getElementById('label-enable-crowdsec').checked = template.enableCrowdSec;
+        document.getElementById('label-ignore-tls-errors').checked = template.ignoreTlsErrors;
+
+        // Trigger change events to show/hide relevant sections
+        document.getElementById('label-enable-tls').dispatchEvent(new Event('change'));
+        document.getElementById('label-tls-method').dispatchEvent(new Event('change'));
+        document.getElementById('label-enable-crowdsec').dispatchEvent(new Event('change'));
+
+        this.showNotification(`Applied ${templateType.replace('-', ' ')} template`, 'success');
     }
 
     showNotification(message, type = 'success') {
