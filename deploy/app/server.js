@@ -2614,6 +2614,304 @@ app.post('/api/config/ui/validate', (req, res) => {
   }
 });
 
+// =============================================================================
+// PROXY CONFIGURATION ENDPOINTS (Phase 6)
+// =============================================================================
+
+// Get current proxy configuration
+app.get('/api/proxy/config', (req, res) => {
+  try {
+    const staticConfig = fs.existsSync(TRAEFIK_CONFIG_PATH) 
+      ? yaml.load(fs.readFileSync(TRAEFIK_CONFIG_PATH, 'utf8')) 
+      : {};
+    
+    // Extract proxy-related configuration
+    const proxyConfig = {
+      enabled: staticConfig.entryPoints?.web?.forwardedHeaders || staticConfig.entryPoints?.websecure?.forwardedHeaders ? true : false,
+      currentPreset: 'custom', // Default to custom
+      forwardedHeaders: {
+        enabled: staticConfig.entryPoints?.web?.forwardedHeaders ? true : false,
+        trustedIPs: staticConfig.entryPoints?.web?.forwardedHeaders?.trustedIPs || [],
+        insecure: staticConfig.entryPoints?.web?.forwardedHeaders?.insecure || false
+      },
+      middleware: extractMiddlewareConfig(staticConfig),
+      rateLimit: extractRateLimitConfig(staticConfig),
+      entryPoints: staticConfig.entryPoints || {}
+    };
+    
+    res.json(proxyConfig);
+  } catch (error) {
+    console.error('Error loading proxy config:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update proxy configuration
+app.put('/api/proxy/config', (req, res) => {
+  try {
+    const { forwardedHeaders, middleware, rateLimit, entryPoints } = req.body;
+    
+    let staticConfig = {};
+    if (fs.existsSync(TRAEFIK_CONFIG_PATH)) {
+      staticConfig = yaml.load(fs.readFileSync(TRAEFIK_CONFIG_PATH, 'utf8'));
+    }
+    
+    // Update entryPoints with forwarded headers configuration
+    if (!staticConfig.entryPoints) staticConfig.entryPoints = {};
+    
+    if (forwardedHeaders && forwardedHeaders.enabled) {
+      ['web', 'websecure'].forEach(entryPoint => {
+        if (!staticConfig.entryPoints[entryPoint]) {
+          staticConfig.entryPoints[entryPoint] = { 
+            address: entryPoint === 'web' ? ':80' : ':443' 
+          };
+        }
+        
+        staticConfig.entryPoints[entryPoint].forwardedHeaders = {
+          trustedIPs: forwardedHeaders.trustedIPs || [],
+          insecure: forwardedHeaders.insecure || false
+        };
+      });
+    } else {
+      // Remove forwarded headers if disabled
+      ['web', 'websecure'].forEach(entryPoint => {
+        if (staticConfig.entryPoints[entryPoint] && staticConfig.entryPoints[entryPoint].forwardedHeaders) {
+          delete staticConfig.entryPoints[entryPoint].forwardedHeaders;
+        }
+      });
+    }
+    
+    // Write updated static configuration
+    fs.writeFileSync(TRAEFIK_CONFIG_PATH, yaml.dump(staticConfig));
+    
+    // Update dynamic configuration with middleware
+    updateDynamicProxyConfig(middleware, rateLimit);
+    
+    res.json({ success: true, message: 'Proxy configuration updated successfully' });
+  } catch (error) {
+    console.error('Error updating proxy config:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Apply proxy preset
+app.post('/api/proxy/preset', (req, res) => {
+  try {
+    const { preset, config } = req.body;
+    
+    let staticConfig = {};
+    if (fs.existsSync(TRAEFIK_CONFIG_PATH)) {
+      staticConfig = yaml.load(fs.readFileSync(TRAEFIK_CONFIG_PATH, 'utf8'));
+    }
+    
+    // Apply preset configuration to entryPoints
+    if (config.entryPoints) {
+      staticConfig.entryPoints = { ...staticConfig.entryPoints, ...config.entryPoints };
+    }
+    
+    // Apply forwarded headers configuration
+    if (config.forwardedHeaders) {
+      ['web', 'websecure'].forEach(entryPoint => {
+        if (staticConfig.entryPoints[entryPoint]) {
+          staticConfig.entryPoints[entryPoint].forwardedHeaders = {
+            trustedIPs: config.forwardedHeaders.trustedIPs || [],
+            insecure: config.forwardedHeaders.insecure || false
+          };
+        }
+      });
+    }
+    
+    // Write updated static configuration
+    fs.writeFileSync(TRAEFIK_CONFIG_PATH, yaml.dump(staticConfig));
+    
+    // Update dynamic configuration with preset middleware
+    updateDynamicProxyConfig(config.middleware, config.rateLimit);
+    
+    res.json({ success: true, message: `${preset} preset applied successfully` });
+  } catch (error) {
+    console.error('Error applying proxy preset:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Test IP forwarding
+app.post('/api/proxy/test-ip', (req, res) => {
+  try {
+    const headers = req.headers;
+    const remoteAddr = req.connection.remoteAddress || req.socket.remoteAddress;
+    const xForwardedFor = headers['x-forwarded-for'];
+    const xRealIP = headers['x-real-ip'];
+    const cfConnectingIP = headers['cf-connecting-ip'];
+    
+    // Determine the most likely real client IP
+    let clientIP = remoteAddr;
+    if (cfConnectingIP) {
+      clientIP = cfConnectingIP;
+    } else if (xRealIP) {
+      clientIP = xRealIP;
+    } else if (xForwardedFor) {
+      clientIP = xForwardedFor.split(',')[0].trim();
+    }
+    
+    // Check if forwarding is working (different from remote address)
+    const forwardingWorking = clientIP !== remoteAddr && (xForwardedFor || xRealIP || cfConnectingIP);
+    
+    const recommendations = [];
+    if (!forwardingWorking) {
+      recommendations.push('Consider configuring trusted proxy IPs in your entryPoints');
+      recommendations.push('Ensure your proxy is sending X-Forwarded-For or X-Real-IP headers');
+    }
+    if (clientIP.startsWith('127.') || clientIP.startsWith('::1')) {
+      recommendations.push('Detected localhost IP - verify proxy configuration');
+    }
+    
+    const result = {
+      success: true,
+      clientIP,
+      remoteAddr,
+      xForwardedFor,
+      xRealIP,
+      cfConnectingIP,
+      forwardingWorking,
+      headers: {
+        'user-agent': headers['user-agent'],
+        'accept': headers['accept']
+      },
+      recommendations: recommendations.length > 0 ? recommendations : null
+    };
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error testing IP forwarding:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Validate proxy configuration
+app.post('/api/proxy/validate', (req, res) => {
+  try {
+    const config = req.body;
+    const errors = [];
+    const warnings = [];
+    
+    // Validate trusted IPs format
+    if (config.forwardedHeaders && config.forwardedHeaders.trustedIPs) {
+      config.forwardedHeaders.trustedIPs.forEach(ip => {
+        if (!isValidIPOrCIDR(ip)) {
+          errors.push(`Invalid IP or CIDR range: ${ip}`);
+        }
+      });
+    }
+    
+    // Validate rate limiting values
+    if (config.rateLimit && config.rateLimit.enabled) {
+      if (config.rateLimit.average <= 0) {
+        errors.push('Rate limit average must be greater than 0');
+      }
+      if (config.rateLimit.burst <= 0) {
+        errors.push('Rate limit burst must be greater than 0');
+      }
+      if (config.rateLimit.burst < config.rateLimit.average) {
+        warnings.push('Rate limit burst should be greater than or equal to average');
+      }
+    }
+    
+    // Check for security recommendations
+    if (config.forwardedHeaders && config.forwardedHeaders.insecure) {
+      warnings.push('Insecure forwarded headers enabled - use only for development');
+    }
+    
+    if (config.forwardedHeaders && config.forwardedHeaders.trustedIPs.length === 0) {
+      warnings.push('No trusted IPs configured - forwarded headers will be ignored');
+    }
+    
+    res.json({
+      valid: errors.length === 0,
+      errors,
+      warnings
+    });
+  } catch (error) {
+    console.error('Error validating proxy config:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Helper functions for proxy configuration
+function extractMiddlewareConfig(staticConfig) {
+  // Extract middleware configuration from static config
+  return {
+    realip: {
+      realIPHeader: 'X-Forwarded-For',
+      depth: 1
+    }
+  };
+}
+
+function extractRateLimitConfig(staticConfig) {
+  // Extract rate limiting configuration
+  return {
+    enabled: false,
+    average: 100,
+    burst: 200,
+    sourceCriterion: {
+      requestHeaderName: 'X-Forwarded-For'
+    }
+  };
+}
+
+function updateDynamicProxyConfig(middleware, rateLimit) {
+  try {
+    let dynamicConfig = {};
+    if (fs.existsSync(DYNAMIC_CONFIG_PATH)) {
+      dynamicConfig = yaml.load(fs.readFileSync(DYNAMIC_CONFIG_PATH, 'utf8'));
+    }
+    
+    if (!dynamicConfig.http) dynamicConfig.http = {};
+    if (!dynamicConfig.http.middlewares) dynamicConfig.http.middlewares = {};
+    
+    // Add real IP middleware if configured
+    if (middleware && middleware.realip) {
+      dynamicConfig.http.middlewares['realip'] = {
+        realIP: {
+          header: middleware.realip.realIPHeader || 'X-Forwarded-For',
+          depth: middleware.realip.depth || 1
+        }
+      };
+    }
+    
+    // Add rate limiting middleware if enabled
+    if (rateLimit && rateLimit.enabled) {
+      dynamicConfig.http.middlewares['proxy-rate-limit'] = {
+        rateLimit: {
+          average: rateLimit.average || 100,
+          burst: rateLimit.burst || 200,
+          sourceCriterion: rateLimit.sourceCriterion || {
+            requestHeaderName: 'X-Forwarded-For'
+          }
+        }
+      };
+    } else {
+      // Remove rate limiting middleware if disabled
+      if (dynamicConfig.http.middlewares['proxy-rate-limit']) {
+        delete dynamicConfig.http.middlewares['proxy-rate-limit'];
+      }
+    }
+    
+    fs.writeFileSync(DYNAMIC_CONFIG_PATH, yaml.dump(dynamicConfig));
+  } catch (error) {
+    console.error('Error updating dynamic proxy config:', error);
+    throw error;
+  }
+}
+
+function isValidIPOrCIDR(ip) {
+  // Basic IP/CIDR validation
+  const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?:\/([0-9]|[1-2][0-9]|3[0-2]))?$/;
+  const ipv6Regex = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::1$|^::$|^([0-9a-fA-F]{1,4}:){1,7}:$|^([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}$|^([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}$|^([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}$|^([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}$|^([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}$|^[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})$|^:((:[0-9a-fA-F]{1,4}){1,7}|:)$/;
+  
+  return ipv4Regex.test(ip) || ipv6Regex.test(ip);
+}
+
 app.listen(PORT, () => {
   console.log(`Traefik UI running on http://localhost:${PORT}`);
 });

@@ -49,13 +49,15 @@ class TraefikUI {
         this.core = new TraefikCoreConfig(this);
         this.network = new TraefikNetworkManager(this);
         this.observability = new TraefikObservability(this);
+        this.proxy = new TraefikProxyConfig(this);
         
         // Make modules globally accessible for onclick handlers
         window.traefikUI = {
             main: this,
             core: this.core,
             network: this.network,
-            observability: this.observability
+            observability: this.observability,
+            proxy: this.proxy
         };
     }
 
@@ -86,6 +88,9 @@ class TraefikUI {
         
         // Observability Event Listeners
         this.setupObservabilityEventListeners();
+        
+        // Proxy Configuration Event Listeners
+        this.setupProxyEventListeners();
     }
 
     setupCoreEventListeners() {
@@ -314,6 +319,39 @@ class TraefikUI {
         }
     }
 
+    setupProxyEventListeners() {
+        // Proxy Configuration Event Listeners
+        const enableIpForwarding = TraefikUtils.getElement('enable-ip-forwarding', false);
+        if (enableIpForwarding) {
+            enableIpForwarding.addEventListener('change', (e) => this.proxy.toggleForwardingOptions(e.target.checked));
+        }
+
+        const enableRateLimiting = TraefikUtils.getElement('enable-rate-limiting', false);
+        if (enableRateLimiting) {
+            enableRateLimiting.addEventListener('change', (e) => this.proxy.toggleRateLimitOptions(e.target.checked));
+        }
+
+        const proxyConfigForm = TraefikUtils.getElement('proxy-config-form', false);
+        if (proxyConfigForm) {
+            proxyConfigForm.addEventListener('submit', (e) => this.proxy.handleProxyConfigSubmit(e));
+        }
+
+        const validateProxyConfig = TraefikUtils.getElement('validate-proxy-config', false);
+        if (validateProxyConfig) {
+            validateProxyConfig.addEventListener('click', () => this.proxy.validateProxyConfiguration());
+        }
+
+        const testIpForwarding = TraefikUtils.getElement('test-ip-forwarding', false);
+        if (testIpForwarding) {
+            testIpForwarding.addEventListener('click', () => this.proxy.testIPForwarding());
+        }
+
+        const exportProxyConfig = TraefikUtils.getElement('export-proxy-config', false);
+        if (exportProxyConfig) {
+            exportProxyConfig.addEventListener('click', () => this.proxy.exportProxyConfig());
+        }
+    }
+
     /**
      * Initial Data Loading
      */
@@ -380,6 +418,16 @@ class TraefikUI {
                 if (!Object.keys(this.observability.config).length) {
                     this.observability.loadObservabilityConfig();
                 }
+                break;
+            case 'proxy-config':
+                // Load proxy configuration and display presets
+                if (!Object.keys(this.proxy.config).length) {
+                    this.proxy.loadProxyConfig().catch(() => {
+                        // Set default config if load fails
+                        this.proxy.config = { enabled: false };
+                    });
+                }
+                this.proxy.displayProxyPresets();
                 break;
         }
     }

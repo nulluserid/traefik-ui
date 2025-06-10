@@ -5,15 +5,15 @@ This file provides comprehensive guidance to Claude Code (claude.ai/code) when w
 **IMPORTANT NOTE:** All development and testing is done on the remote server at root@10.0.1.125 under /opt/traefik-ui/. Local development server is NOT used. Always deploy changes to the remote server for testing via git pull.
 
 ## Project Overview
-**Version:** 0.0.6  
-**Type:** Enterprise-grade web interface for Traefik reverse proxy with network topology visualization and observability management  
+**Version:** 0.0.7  
+**Type:** Enterprise-grade web interface for Traefik reverse proxy with network topology visualization, observability management, and remote proxy configuration  
 **Tech Stack:** Node.js (Express), Vanilla JavaScript, CSS3, Docker, dockerode
 
 ## Version Management Policy
 **IMPORTANT:** Every completed phase increments version by 0.0.1
 - Phase completion = version bump in package.json files + CLAUDE.md update
-- Current: v0.0.6 (Phases 1-5.5 completed)
-- Next: v0.0.7 (Phase 6: Remote Proxy Configuration)
+- Current: v0.0.7 (Phases 1-6 completed)
+- Next: v0.0.8 (Future enhancements)
 - Pattern: v0.0.X where X = completed phase count  
 
 ### Core Purpose
@@ -113,13 +113,14 @@ This project has both a standalone version (root directory) and a complete deplo
 - Validation for RFC2136 parameters and TSIG algorithms
 
 ### Frontend Architecture (Vanilla JavaScript)
-**Modular Architecture** (NEW in v0.0.6):
+**Modular Architecture** (ENHANCED in v0.0.7):
 - **`js/traefik-ui.js`** - Main orchestrator class with initialization and tab management
 - **`js/utils.js`** - Shared utilities (API requests, notifications, validation, helpers)
 - **`js/ui-components.js`** - Reusable UI components (modals, tables, forms, cards)
 - **`js/core-config.js`** - Route/service/DNS/TLS/middleware management
 - **`js/network-manager.js`** - Docker service discovery and network operations
 - **`js/observability.js`** - Domain monitoring, health checks, and observability configuration
+- **`js/proxy-config.js`** - Remote proxy scenarios, IP forwarding, and security settings (NEW in v0.0.7)
 - Event-driven architecture with DOM manipulation
 - No frameworks - pure JavaScript with fetch API
 - **Organized modular design for maintainability and future expansion**
@@ -142,6 +143,7 @@ This project has both a standalone version (root directory) and a complete deplo
 - Add Route: Form-based route creation with **intelligent network validation** (NEW in v0.0.5)
 - Middleware: CrowdSec configuration management
 - DNS Providers: TSIG/RFC2136 configuration management
+- **Proxy Config: Remote proxy scenarios with IP forwarding and security** (NEW in v0.0.7)
 - **Observability: Complete logging, metrics, and tracing management with presets** (NEW in v0.0.6)
 
 **🛠️ Tools Group:**
@@ -552,41 +554,43 @@ This overview dashboard provides operations teams with a single pane of glass fo
 - Configuration validation and testing infrastructure
 - Integration with existing restart mechanism and UI configuration system
 
-### Phase 6: Remote Proxy Configuration (PRIORITY)
-**Goal:** Optimize Traefik for remote proxy scenarios with proper IP handling
+### Phase 6: Remote Proxy Configuration ✅ COMPLETED
+**Revolutionary proxy configuration system for production deployments behind external proxies:**
 
-**Implementation Plan:**
-1. **IP Forwarding Configuration**
-   - Enable real IP forwarding from external sources
-   - Configure trusted proxies and IP ranges
-   - X-Forwarded-For header handling
-   - X-Real-IP header configuration
+**🌐 Proxy Scenario Presets:**
+- **CloudFlare**: Complete CloudFlare IP ranges with CF-Connecting-IP header support
+- **AWS ALB**: VPC subnet trust with X-Forwarded-For handling
+- **nginx**: X-Real-IP and custom proxy range configuration
+- **HAProxy**: PROXY protocol support with load balancer integration
+- **Custom**: Manual configuration for specific proxy setups
 
-2. **Remote Proxy Options with Explanations**
-   - Checkbox options with detailed explanations for common proxy scenarios
-   - **Pass External IP to Container** (like nginx) - Forward real client IP to backend services
-   - **Trust Forwarded Headers**: Accept X-Forwarded-* headers from trusted sources
-   - **Preserve Host Header**: Maintain original Host header for backends
-   - **External IP Detection**: Show real client IPs in logs and access
-   - **Proxy Protocol**: Enable PROXY protocol for upstream connections
+**🔍 IP Forwarding & Trust Management:**
+- Trusted proxy IP range configuration (CIDR notation support)
+- Multiple header support (X-Forwarded-For, X-Real-IP, CF-Connecting-IP)
+- Header depth configuration for multi-hop proxies
+- Insecure mode for development environments
+- Real-time IP detection and validation testing
 
-3. **Security & Rate Limiting**
-   - Rate limiting based on real client IPs
-   - IP-based access control and whitelisting
-   - DDoS protection configuration
-   - Secure header forwarding policies
+**⚡ Security & Rate Limiting:**
+- IP-based rate limiting with configurable average/burst rates
+- Source IP extraction from forwarded headers
+- Rate limiting based on real client IPs (not proxy IPs)
+- Configuration validation with security warnings
+- Export/import functionality for configuration management
 
-4. **Remote Proxy UI**
-   - Configuration wizard for common proxy scenarios
-   - Behind CloudFlare, AWS ALB, nginx, HAProxy presets
-   - Real-time IP detection testing
-   - Configuration validation and testing tools
+**🛠️ Advanced Features:**
+- Real-time IP forwarding test endpoint
+- Configuration validation with detailed error reporting
+- Automatic preset application with one-click setup
+- Integration with existing Traefik static/dynamic configuration
+- Comprehensive documentation and explanations for each preset
 
 **Technical Implementation:**
-- EntryPoint configuration management
-- Middleware configuration for IP handling
-- Trust store management for proxy IPs
-- Real-time configuration testing
+- Complete API endpoint suite (`/api/proxy/*`)
+- Static configuration (traefik.yml) entryPoints management
+- Dynamic middleware generation for rate limiting
+- IP/CIDR validation with IPv4/IPv6 support
+- Real-time configuration testing and validation
 
 ### Remote Proxy Configuration Examples:
 **Behind CloudFlare:**

@@ -1,6 +1,6 @@
 {
   "name": "traefik-ui",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Web UI for managing Traefik proxy configurations with DNS provider management and CrowdSec integration",
   "main": "deploy/app/server.js",
   "scripts": {

@@ -30,6 +30,7 @@
                 <button class="tab-btn" data-tab="add-route">Add Route</button>
                 <button class="tab-btn" data-tab="middleware">Middleware</button>
                 <button class="tab-btn" data-tab="dns-providers">DNS Providers</button>
+                <button class="tab-btn" data-tab="proxy-config">Proxy Config</button>
                 <button class="tab-btn" data-tab="observability">Observability</button>
             </div>
             
@@ -872,6 +873,142 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...
             </div>
         </div>
 
+        <div id="proxy-config" class="tab-content">
+            <div class="section">
+                <h2>🌐 Remote Proxy Configuration</h2>
+                <p class="section-description">
+                    Configure Traefik to work behind external proxies (CloudFlare, AWS ALB, nginx, HAProxy) with proper IP forwarding and security settings.
+                </p>
+                
+                <!-- Status Overview -->
+                <div class="status-overview">
+                    <div class="status-item">
+                        <span class="status-label">IP Forwarding:</span>
+                        <span id="forwarding-status" class="status-indicator disabled">Disabled</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Rate Limiting:</span>
+                        <span id="rate-limiting-status" class="status-indicator disabled">Disabled</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Trusted IPs:</span>
+                        <span id="trusted-ips-status" class="status-indicator disabled">None</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Proxy Presets Section -->
+            <div class="section">
+                <h3>🚀 Proxy Scenario Presets</h3>
+                <p>Quick setup for common proxy scenarios with explanations and optimal configurations.</p>
+                
+                <div id="proxy-presets-list" class="presets-grid">
+                    <!-- Presets will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Manual Configuration Section -->
+            <div class="section">
+                <h3>⚙️ Manual Configuration</h3>
+                
+                <form id="proxy-config-form" class="form-grid">
+                    <!-- IP Forwarding Configuration -->
+                    <div class="form-section">
+                        <h4>🔍 IP Forwarding & Trust</h4>
+                        
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="enable-ip-forwarding"> 
+                                Enable IP Forwarding
+                            </label>
+                            <small class="form-help">Allow Traefik to trust forwarded IP headers from proxy servers</small>
+                        </div>
+
+                        <div id="forwarding-options" style="display: none;">
+                            <div class="form-group">
+                                <label for="trusted-ips">Trusted Proxy IP Ranges</label>
+                                <textarea id="trusted-ips" name="trustedIps" rows="6" 
+                                    placeholder="192.168.1.0/24&#10;10.0.0.0/8&#10;172.16.0.0/12"></textarea>
+                                <small class="form-help">Enter one IP address or CIDR range per line. Only these IPs will be trusted for forwarded headers.</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="real-ip-header">Real IP Header</label>
+                                <select id="real-ip-header" name="realIpHeader">
+                                    <option value="X-Forwarded-For">X-Forwarded-For</option>
+                                    <option value="X-Real-IP">X-Real-IP</option>
+                                    <option value="CF-Connecting-IP">CF-Connecting-IP (CloudFlare)</option>
+                                    <option value="X-Forwarded">X-Forwarded</option>
+                                </select>
+                                <small class="form-help">Header used to determine the real client IP address</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="forwarded-depth">Header Depth</label>
+                                <input type="number" id="forwarded-depth" name="forwardedDepth" value="1" min="1" max="10">
+                                <small class="form-help">How many proxy hops to traverse in forwarded headers</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="allow-insecure-forwarding"> 
+                                    Allow Insecure Forwarding (Development Only)
+                                </label>
+                                <small class="form-help">⚠️ Trust forwarded headers from any source - use only for development</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rate Limiting Configuration -->
+                    <div class="form-section">
+                        <h4>⚡ Rate Limiting & Security</h4>
+                        
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="enable-rate-limiting"> 
+                                Enable Rate Limiting
+                            </label>
+                            <small class="form-help">Limit requests per second based on real client IP</small>
+                        </div>
+
+                        <div id="rate-limit-options" style="display: none;">
+                            <div class="form-group">
+                                <label for="rate-limit-average">Average Requests/Second</label>
+                                <input type="number" id="rate-limit-average" name="rateLimitAverage" value="100" min="1">
+                                <small class="form-help">Sustained request rate limit per client</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="rate-limit-burst">Burst Requests</label>
+                                <input type="number" id="rate-limit-burst" name="rateLimitBurst" value="200" min="1">
+                                <small class="form-help">Maximum burst of requests allowed</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="rate-source-header">Rate Limit Source Header</label>
+                                <input type="text" id="rate-source-header" name="rateSourceHeader" value="X-Forwarded-For">
+                                <small class="form-help">Header used to identify clients for rate limiting</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">💾 Save Configuration</button>
+                        <button type="button" id="validate-proxy-config" class="btn btn-secondary">✅ Validate</button>
+                        <button type="button" id="test-ip-forwarding" class="btn btn-accent">🔍 Test IP Forwarding</button>
+                        <button type="button" id="export-proxy-config" class="btn btn-secondary">📤 Export Config</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- IP Test Results -->
+            <div class="section">
+                <div id="ip-test-results" style="display: none;">
+                    <!-- Test results will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
         <div id="templates" class="tab-content">
             <div class="section">
                 <h2>Quick Templates</h2>
@@ -1096,12 +1233,13 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...
 
     <div id="notification" class="notification hidden"></div>
     
-    <!-- Traefik UI Modular Scripts (v0.0.6) -->
+    <!-- Traefik UI Modular Scripts (v0.0.7) -->
     <script src="js/utils.js"></script>
     <script src="js/ui-components.js"></script>
     <script src="js/core-config.js"></script>
     <script src="js/network-manager.js"></script>
     <script src="js/observability.js"></script>
+    <script src="js/proxy-config.js"></script>
     <script src="js/traefik-ui.js"></script>
 </body>
 </html>
