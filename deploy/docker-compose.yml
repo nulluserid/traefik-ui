@@ -11,7 +11,7 @@ services:
       - "8080:8080"  # Traefik dashboard
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./config/traefik.yml:/traefik.yml:ro
+      - ./config/traefik.yml:/traefik.yml:rw
       - ./config/dynamic.yml:/dynamic.yml:rw
       - ./data:/data
       - ./logs:/logs
@@ -45,7 +45,7 @@ services:
     container_name: traefik-ui
     restart: unless-stopped
     volumes:
-      - ./config:/config:ro
+      - ./config:/config:rw
       - ./certs:/app/certs
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
