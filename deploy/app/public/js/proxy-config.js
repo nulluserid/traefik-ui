@@ -1,7 +1,7 @@
 /**
  * Traefik UI - Proxy Configuration Module
  * Handles remote proxy scenarios, IP forwarding, and security settings
- * Version: 0.6.4
+ * Version: 0.6.5
  */
 
 class TraefikProxyConfig {

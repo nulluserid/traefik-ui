@@ -1,7 +1,7 @@
 /**
  * Traefik UI - Observability Module
  * Handles domain overview, health monitoring, logging, metrics, and tracing
- * Version: 0.6.4
+ * Version: 0.6.5
  */
 
 class TraefikObservability {
