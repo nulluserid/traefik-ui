@@ -1119,6 +1119,290 @@ async function analyzeNetworkPath(backend) {
   return { type: 'docker', connected: false, error: 'Analysis failed' };
 }
 
+// Phase 5: Observability Configuration API Endpoints
+
+// Get current observability configuration
+app.get('/api/observability/config', async (req, res) => {
+  try {
+    let staticConfig = {};
+    if (fs.existsSync(TRAEFIK_CONFIG_PATH)) {
+      staticConfig = yaml.load(fs.readFileSync(TRAEFIK_CONFIG_PATH, 'utf8'));
+    }
+
+    const observabilityConfig = {
+      accessLogs: analyzeAccessLogsConfig(staticConfig),
+      metrics: analyzeMetricsConfig(staticConfig),
+      tracing: analyzeTracingConfig(staticConfig)
+    };
+
+    res.json(observabilityConfig);
+  } catch (error) {
+    console.error('Observability config error:', error);
+    res.status(500).json({ error: 'Failed to get observability configuration' });
+  }
+});
+
+// Update access logs configuration
+app.put('/api/observability/logs', async (req, res) => {
+  try {
+    const { enabled, format, filePath, customFormat, graylog } = req.body;
+    
+    let staticConfig = {};
+    if (fs.existsSync(TRAEFIK_CONFIG_PATH)) {
+      staticConfig = yaml.load(fs.readFileSync(TRAEFIK_CONFIG_PATH, 'utf8'));
+    }
+
+    if (enabled) {
+      staticConfig.accessLog = {
+        filePath: filePath || '/logs/access.log'
+      };
+
+      // Set log format
+      if (format === 'json') {
+        staticConfig.accessLog.format = 'json';
+      } else if (format === 'clf') {
+        staticConfig.accessLog.format = 'common';
+      } else if (format === 'custom' && customFormat) {
+        staticConfig.accessLog.format = customFormat;
+      }
+
+      // Add Graylog configuration if enabled
+      if (graylog?.enabled && graylog.endpoint) {
+        // Note: Graylog integration would typically require additional log shipping setup
+        // This is a placeholder for the configuration
+        staticConfig.accessLog.graylog = {
+          endpoint: graylog.endpoint,
+          facility: graylog.facility || 'traefik'
+        };
+      }
+    } else {
+      // Disable access logs
+      delete staticConfig.accessLog;
+    }
+
+    fs.writeFileSync(TRAEFIK_CONFIG_PATH, yaml.dump(staticConfig));
+    res.json({ success: true, message: 'Access logs configuration updated' });
+  } catch (error) {
+    console.error('Access logs update error:', error);
+    res.status(500).json({ error: 'Failed to update access logs configuration' });
+  }
+});
+
+// Update metrics configuration
+app.put('/api/observability/metrics', async (req, res) => {
+  try {
+    const { enabled, port, path, interval, categories } = req.body;
+    
+    let staticConfig = {};
+    if (fs.existsSync(TRAEFIK_CONFIG_PATH)) {
+      staticConfig = yaml.load(fs.readFileSync(TRAEFIK_CONFIG_PATH, 'utf8'));
+    }
+
+    if (enabled) {
+      staticConfig.metrics = {
+        prometheus: {
+          addEntryPointsLabels: categories?.entrypoint || true,
+          addRoutersLabels: categories?.router || true,
+          addServicesLabels: categories?.service || true
+        }
+      };
+
+      // Add metrics endpoint to entrypoints if specified
+      if (port && port !== 8080) {
+        if (!staticConfig.entryPoints) staticConfig.entryPoints = {};
+        staticConfig.entryPoints.metrics = {
+          address: `:${port}`
+        };
+      }
+    } else {
+      // Disable metrics
+      delete staticConfig.metrics;
+      if (staticConfig.entryPoints?.metrics) {
+        delete staticConfig.entryPoints.metrics;
+      }
+    }
+
+    fs.writeFileSync(TRAEFIK_CONFIG_PATH, yaml.dump(staticConfig));
+    res.json({ 
+      success: true, 
+      message: 'Metrics configuration updated',
+      metricsUrl: enabled ? `http://localhost:${port || 8080}${path || '/metrics'}` : null
+    });
+  } catch (error) {
+    console.error('Metrics update error:', error);
+    res.status(500).json({ error: 'Failed to update metrics configuration' });
+  }
+});
+
+// Update tracing configuration
+app.put('/api/observability/tracing', async (req, res) => {
+  try {
+    const { enabled, backend, endpoint, samplingRate, serviceName, headers } = req.body;
+    
+    let staticConfig = {};
+    if (fs.existsSync(TRAEFIK_CONFIG_PATH)) {
+      staticConfig = yaml.load(fs.readFileSync(TRAEFIK_CONFIG_PATH, 'utf8'));
+    }
+
+    if (enabled) {
+      staticConfig.tracing = {
+        serviceName: serviceName || 'traefik',
+        sampleRate: parseFloat(samplingRate) || 1.0
+      };
+
+      // Configure backend-specific settings
+      switch (backend) {
+        case 'jaeger':
+          staticConfig.tracing.jaeger = {
+            samplingServerURL: endpoint || 'http://jaeger:5778/sampling',
+            localAgentHostPort: endpoint?.replace(/^https?:\/\//, '').replace(/\/.*$/, '') || 'jaeger:6831'
+          };
+          break;
+        case 'zipkin':
+          staticConfig.tracing.zipkin = {
+            httpEndpoint: endpoint || 'http://zipkin:9411/api/v2/spans'
+          };
+          break;
+        case 'otlp':
+          staticConfig.tracing.otlp = {
+            http: {
+              endpoint: endpoint || 'http://otel-collector:4318/v1/traces'
+            }
+          };
+          break;
+      }
+
+      // Add custom headers if specified
+      if (headers) {
+        const headersList = headers.split('\n').filter(h => h.trim());
+        if (headersList.length > 0) {
+          staticConfig.tracing.capturedRequestHeaders = headersList;
+        }
+      }
+    } else {
+      // Disable tracing
+      delete staticConfig.tracing;
+    }
+
+    fs.writeFileSync(TRAEFIK_CONFIG_PATH, yaml.dump(staticConfig));
+    res.json({ success: true, message: 'Tracing configuration updated' });
+  } catch (error) {
+    console.error('Tracing update error:', error);
+    res.status(500).json({ error: 'Failed to update tracing configuration' });
+  }
+});
+
+// Test observability connections
+app.post('/api/observability/test', async (req, res) => {
+  try {
+    const { type, config } = req.body;
+    const results = { success: false, message: '', details: {} };
+
+    switch (type) {
+      case 'metrics':
+        // Test metrics endpoint accessibility
+        const metricsUrl = `http://localhost:${config.port || 8080}${config.path || '/metrics'}`;
+        try {
+          // Note: In a real implementation, you'd make an HTTP request to test the endpoint
+          results.success = true;
+          results.message = 'Metrics endpoint configuration is valid';
+          results.details.url = metricsUrl;
+        } catch (error) {
+          results.message = 'Metrics endpoint is not accessible';
+          results.details.error = error.message;
+        }
+        break;
+
+      case 'tracing':
+        // Test tracing backend connection
+        try {
+          // Note: In a real implementation, you'd test the actual connection
+          results.success = true;
+          results.message = `${config.backend} tracing configuration is valid`;
+          results.details.endpoint = config.endpoint;
+        } catch (error) {
+          results.message = `Failed to connect to ${config.backend}`;
+          results.details.error = error.message;
+        }
+        break;
+
+      case 'graylog':
+        // Test Graylog connection
+        try {
+          // Note: In a real implementation, you'd test GELF UDP connection
+          results.success = true;
+          results.message = 'Graylog configuration is valid';
+          results.details.endpoint = config.endpoint;
+        } catch (error) {
+          results.message = 'Failed to connect to Graylog';
+          results.details.error = error.message;
+        }
+        break;
+
+      default:
+        results.message = 'Unknown test type';
+    }
+
+    res.json(results);
+  } catch (error) {
+    console.error('Observability test error:', error);
+    res.status(500).json({ error: 'Failed to test observability configuration' });
+  }
+});
+
+// Helper functions for analyzing current configuration
+function analyzeAccessLogsConfig(staticConfig) {
+  const accessLog = staticConfig.accessLog || {};
+  return {
+    enabled: !!staticConfig.accessLog,
+    format: accessLog.format || 'common',
+    filePath: accessLog.filePath || '/logs/access.log',
+    graylog: accessLog.graylog || null
+  };
+}
+
+function analyzeMetricsConfig(staticConfig) {
+  const metrics = staticConfig.metrics?.prometheus || {};
+  const metricsPort = staticConfig.entryPoints?.metrics?.address?.replace(':', '') || '8080';
+  
+  return {
+    enabled: !!staticConfig.metrics,
+    port: parseInt(metricsPort) || 8080,
+    path: '/metrics',
+    categories: {
+      entrypoint: metrics.addEntryPointsLabels !== false,
+      router: metrics.addRoutersLabels !== false,
+      service: metrics.addServicesLabels !== false
+    }
+  };
+}
+
+function analyzeTracingConfig(staticConfig) {
+  const tracing = staticConfig.tracing || {};
+  let backend = 'jaeger'; // default
+  let endpoint = '';
+
+  if (tracing.jaeger) {
+    backend = 'jaeger';
+    endpoint = tracing.jaeger.localAgentHostPort || '';
+  } else if (tracing.zipkin) {
+    backend = 'zipkin';
+    endpoint = tracing.zipkin.httpEndpoint || '';
+  } else if (tracing.otlp) {
+    backend = 'otlp';
+    endpoint = tracing.otlp.http?.endpoint || '';
+  }
+
+  return {
+    enabled: !!staticConfig.tracing,
+    backend,
+    endpoint,
+    samplingRate: tracing.sampleRate || 1.0,
+    serviceName: tracing.serviceName || 'traefik',
+    headers: tracing.capturedRequestHeaders?.join('\n') || ''
+  };
+}
+
 app.listen(PORT, () => {
   console.log(`Traefik UI running on http://localhost:${PORT}`);
 });

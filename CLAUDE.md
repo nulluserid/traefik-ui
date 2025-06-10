@@ -3,17 +3,20 @@
 This file provides comprehensive guidance to Claude Code (claude.ai/code) when working with the Traefik UI project.
 
 ## Project Overview
-**Version:** 0.0.3  
+**Version:** 0.0.5  
 **Type:** Web-based configuration management interface for Traefik reverse proxy  
-**Tech Stack:** Node.js (Express), Vanilla JavaScript, CSS3, Docker  
+**Tech Stack:** Node.js (Express), Vanilla JavaScript, CSS3, Docker, dockerode  
 
 ### Core Purpose
 Eliminates manual editing of Traefik configuration files by providing a visual web interface for:
-- Route and service management
+- Route and service management with intelligent network validation
+- Docker service discovery and container label management
+- **Network management for multi-stack deployments** (NEW in v0.0.5)
 - DNS provider configuration (RFC2136/TSIG)
 - CrowdSec middleware integration
-- **Docker label generation for GitOps workflows** (NEW in v0.0.3)
+- Docker label generation for GitOps workflows
 - TLS certificate management (Let's Encrypt + custom certs)
+- **Organized navigation with grouped menu system** (NEW in v0.0.5)
 
 ## Development Commands
 
@@ -86,6 +89,12 @@ This project has both a standalone version (root directory) and a complete deplo
 - `/api/certificate` - Custom certificate upload/management
 - `/api/dns-providers` - DNS provider/TSIG configuration management
 - `/api/restart` - Traefik service restart via child process execution
+- **`/api/docker/services`** - Docker container discovery and label management (NEW in v0.0.5)
+- **`/api/docker/networks`** - Docker network discovery and topology (NEW in v0.0.5)
+- **`/api/networks/management`** - Network management with Traefik connection status (NEW in v0.0.5)
+- **`/api/networks/:id/connect`** - Connect Traefik to external networks (NEW in v0.0.5)
+- **`/api/networks/:id/disconnect`** - Disconnect Traefik from networks (NEW in v0.0.5)
+- **`/api/networks/topology`** - Network topology visualization data (NEW in v0.0.5)
 
 **DNS Provider System**:
 - JSON-based persistent storage in `dns-providers.json`
@@ -99,16 +108,25 @@ This project has both a standalone version (root directory) and a complete deplo
 - No frameworks - pure JavaScript with fetch API
 
 **Theme System**:
+- **Enhanced cyberpunk theme with improved contrast** (UPDATED in v0.0.5)
 - CSS custom properties for dual light/dark themes
 - Automatic system preference detection with manual override
 - LocalStorage persistence for user preference
+- **Reduced glow effects for better text readability** (UPDATED in v0.0.5)
 
-**Tab-Based Interface**:
-- Overview: Current routes/services display
-- Add Route: Form-based route creation with TLS options
+**Grouped Navigation Interface** (NEW in v0.0.5):
+**📊 Monitoring Group:**
+- Overview: Current routes/services display with health status
+- **Service Discovery: Docker container scanning and management** (NEW in v0.0.5)
+- **Network Management: Multi-stack network connectivity** (NEW in v0.0.5)
+
+**⚙️ Configuration Group:**
+- Add Route: Form-based route creation with **intelligent network validation** (NEW in v0.0.5)
 - Middleware: CrowdSec configuration management
 - DNS Providers: TSIG/RFC2136 configuration management
-- **Label Generator: Docker label generation for GitOps** (NEW in v0.0.3)
+
+**🛠️ Tools Group:**
+- Label Generator: Docker label generation for GitOps
 - Templates: Quick-start templates for common scenarios
 
 ### TLS and Certificate Management
@@ -183,32 +201,56 @@ This project has both a standalone version (root directory) and a complete deplo
 - Certificate format validation for custom uploads
 - Form validation prevents invalid route creation
 
-## Current Features Status (v0.0.3)
+## Current Features Status (v0.0.5)
 
 ### ✅ Completed Features
-1. **Visual Configuration Management** - Web interface for routes/services
-2. **DNS Provider Management** - RFC2136/TSIG configurations with reusable settings
-3. **CrowdSec Integration** - Complete middleware management with AppSec support
-4. **TLS Management** - Let's Encrypt (HTTP/DNS) + custom certificate support
-5. **Theme System** - Auto dark/light mode with manual toggle
-6. **Template System** - Quick-start templates for common scenarios
-7. **Docker Label Generator** - NEW: Generate Traefik labels for docker-compose services
+1. **Visual Configuration Management** - Web interface for routes/services with intelligent validation
+2. **Docker Service Discovery** - Scan and manage containers with Traefik labels (NEW in v0.0.5)
+3. **Network Management** - Connect Traefik to external docker-compose networks (NEW in v0.0.5)
+4. **DNS Provider Management** - RFC2136/TSIG configurations with reusable settings
+5. **CrowdSec Integration** - Complete middleware management with AppSec support
+6. **TLS Management** - Let's Encrypt (HTTP/DNS) + custom certificate support
+7. **Enhanced Cyberpunk Theme** - Improved contrast and readability (UPDATED in v0.0.5)
+8. **Organized Navigation** - Grouped menu system with logical organization (NEW in v0.0.5)
+9. **Docker Label Generator** - Generate Traefik labels for docker-compose services
+10. **Template System** - Quick-start templates for common scenarios
 
-### 🔄 Recent Addition: Label Generator
-The Label Generator (added in v0.0.3) bridges file-based configuration with Docker label-based service discovery:
+### ⚠️ Known Issues (v0.0.5)
+1. **Network Attachability Bug** - Networks showing "not attachable" when they should be connectable
+2. **Primary Network Disconnect Bug** - "deploy_traefik" network shows conflicting disconnect options (says both "cannot disconnect" and shows disconnect button)
+3. **Service Discovery Filtering** - Service filtering dropdown needs implementation
+4. **Scan vs Refresh Distinction** - Need to differentiate scan and refresh functionality
+
+### 🚀 Major Addition: Network Management (v0.0.5)
+Complete network management system enabling multi-stack Docker deployments:
 
 **Key Features:**
-- Form-based Docker label generation
-- Integration with existing DNS providers and middleware
-- Copy-to-clipboard functionality with visual feedback  
-- Template system for common scenarios (Simple Web App, API Service, Protected Service, Development Service)
-- Complete docker-compose.yml example generation
+- **Network Discovery**: Scan all Docker networks with Traefik connection status
+- **Smart Connection Management**: Connect/disconnect Traefik to external networks
+- **Network Topology Visualization**: Interactive network maps showing container relationships
+- **Intelligent Route Validation**: Automatic network connectivity checks during route creation
+- **Cross-Stack Integration**: Enable services from external stacks to use Traefik
 
 **Implementation Details:**
-- New tab between DNS Providers and Templates
-- `buildTraefikLabels()` method generates proper Docker labels with escaping
-- Dynamic form fields based on TLS method selection
-- Template system with `useLabelTemplate()` method
+- New "Network Management" tab in Monitoring group
+- Docker API integration using dockerode library
+- `/api/networks/management` endpoint for network discovery with Traefik status
+- `/api/networks/:id/connect` and `/api/networks/:id/disconnect` for network management
+- Smart modal dialogs offering to connect required networks during route creation
+- Real-time network status monitoring and filtering
+
+### 🎨 Enhanced User Experience (v0.0.5)
+**Contrast & Readability Improvements:**
+- Fixed light blue buttons with white text issues
+- Dark purple/red/pink gradients with crisp white text for all badges
+- Reduced excessive glow effects (5px → 2px for tabs, 10px → 3px for headings)
+- Enhanced notification contrast with gradient backgrounds
+
+**Navigation & Organization:**
+- Grouped menu system: Monitoring, Configuration, Tools
+- Responsive design with mobile-friendly layouts
+- Smart button differentiation (Scan vs Refresh functionality)
+- Enhanced service filtering with proper status-based filtering
 
 ## Development Roadmap
 
@@ -218,69 +260,31 @@ The Label Generator (added in v0.0.3) bridges file-based configuration with Dock
 - [x] Copy-to-clipboard functionality
 - [x] Integration with existing DNS/middleware systems
 
-### Phase 2: Service Discovery (NEXT PRIORITY)
-**Goal:** Discover and manage services that already have Traefik labels
+### Phase 2: Service Discovery ✅ COMPLETED  
+- [x] Docker daemon integration via dockerode
+- [x] Container scanning for existing Traefik labels
+- [x] Service management interface with filtering
+- [x] Network discovery and display
+- [x] Label parsing and validation
+- [x] Real-time service status monitoring
 
-**Implementation Plan:**
-1. **Docker Integration**
-   - Connect to Docker daemon via socket/API (`/var/run/docker.sock`)
-   - Scan running containers for existing Traefik labels
-   - Parse and display discovered service configurations
+### Phase 3: Network Management ✅ COMPLETED
+- [x] External network discovery and scanning
+- [x] Traefik network connection management (connect/disconnect)
+- [x] Cross-stack service integration
+- [x] Visual network topology with connection status
+- [x] Network health checks and connectivity testing
+- [x] Intelligent route validation with network connectivity checks
+- [x] Smart modal dialogs for automatic network connection
 
-2. **Service Management Interface**
-   - New "Service Discovery" tab after Label Generator
-   - List all label-based services vs file-based routes
-   - Show service health, status, and current label configuration
-   - Enable/disable services without modifying labels
+**Technical Achievements:**
+- Complete Docker API integration using dockerode
+- Network connect/disconnect API endpoints (`/api/networks/:id/connect`, `/api/networks/:id/disconnect`)
+- Network topology visualization (`/api/networks/topology`)
+- Smart route validation with automatic network connectivity offers
+- Real-time network status monitoring and filtering
 
-3. **Label Editing Capabilities**
-   - In-place editing of existing Docker labels
-   - Validation against current Traefik configuration
-   - Update container labels without container recreation
-   - Sync changes back to docker-compose files if needed
-
-4. **Network Discovery**
-   - Detect which networks Traefik is connected to
-   - Show service network connectivity and routing paths
-   - Identify external networks that need Traefik access
-
-**Technical Implementation:**
-- Add Docker API client (`dockerode` or direct HTTP API calls)
-- New `/api/docker/services` endpoint for container discovery
-- Label parsing and validation functions
-- Live container status monitoring
-
-### Phase 3: Network Management (NEXT PRIORITY)
-**Goal:** Connect Traefik to external docker-compose networks for multi-stack deployments
-
-**Implementation Plan:**
-1. **External Network Discovery**
-   - Scan and list all Docker networks on the system
-   - Identify networks from other docker-compose stacks
-   - Show network details (driver, subnet, gateway, containers)
-
-2. **Traefik Network Management**
-   - Add/remove Traefik from external networks dynamically
-   - Network connection interface with validation
-   - Real-time network status monitoring
-
-3. **Cross-Stack Service Integration**
-   - Enable services from external stacks to use Traefik
-   - Network bridging configuration and testing
-   - DNS resolution management across networks
-
-4. **Network Configuration UI**
-   - Visual network topology with connection status
-   - One-click network joining/leaving
-   - Network health checks and connectivity testing
-
-**Technical Implementation:**
-- New "Network Management" tab after Service Discovery
-- Docker network connect/disconnect API endpoints
-- Network scanning and validation functions
-- Visual network topology display
-
-### Phase 4: Network Map & Observability Dashboard (FUTURE)
+### Phase 4: Network Map & Observability Dashboard (NEXT - PRIORITY)
 **Goal:** Comprehensive network topology view with observability integration
 
 **Implementation Plan:**
@@ -304,7 +308,7 @@ The Label Generator (added in v0.0.3) bridges file-based configuration with Dock
    - **Load Balancing**: Multiple backends, health checks, failover config
    - **Network Traversal**: Visual path through Docker networks
 
-4. **OpenTelemetry Integration**
+4. **OpenTelemetry Integration** (🌐 Reference: https://doc.traefik.io/traefik/observability/tracing/overview/)
    - Configure Traefik tracing to external systems (Jaeger, Zipkin)
    - Display request traces and performance metrics
    - Service dependency mapping from trace data
@@ -347,12 +351,12 @@ The Label Generator (added in v0.0.3) bridges file-based configuration with Dock
 
 This overview dashboard will provide operations teams with a single pane of glass for understanding the complete routing topology and identifying potential issues before they become problems.
 
-### Phase 5: Observability & Logging Configuration (FUTURE)
+### Phase 5: Observability & Logging Configuration (PRIORITY)
 **Goal:** Configure and manage Traefik observability features through the UI
 
 **Implementation Plan:**
 1. **Access Logs Configuration**
-   - UI to configure external Graylog integration
+   - UI to configure external Graylog integration (configurable endpoint/format)
    - Log format selection (JSON, CLF, custom)
    - Log filtering and sampling configuration
    - Real-time log stream preview
@@ -381,7 +385,7 @@ This overview dashboard will provide operations teams with a single pane of glas
 - Configuration validation and testing
 - Integration with existing restart mechanism
 
-### Phase 6: Remote Proxy Configuration (FUTURE)
+### Phase 6: Remote Proxy Configuration (PRIORITY)
 **Goal:** Optimize Traefik for remote proxy scenarios with proper IP handling
 
 **Implementation Plan:**
@@ -391,8 +395,9 @@ This overview dashboard will provide operations teams with a single pane of glas
    - X-Forwarded-For header handling
    - X-Real-IP header configuration
 
-2. **Remote Proxy Options**
-   - Checkbox options with explanations for common proxy scenarios
+2. **Remote Proxy Options with Explanations**
+   - Checkbox options with detailed explanations for common proxy scenarios
+   - **Pass External IP to Container** (like nginx) - Forward real client IP to backend services
    - **Trust Forwarded Headers**: Accept X-Forwarded-* headers from trusted sources
    - **Preserve Host Header**: Maintain original Host header for backends
    - **External IP Detection**: Show real client IPs in logs and access
@@ -505,33 +510,35 @@ Generate Docker labels for GitOps workflows with template system and copy-to-cli
 ### ✅ Phase 2: Service Discovery (COMPLETED)  
 Discover and manage Docker containers with Traefik labels, including network visualization and service management.
 
-### 🎯 Phase 3: Network Management (NEXT PRIORITY)
+### ✅ Phase 3: Network Management (COMPLETED)
 **Implementation Steps:**
-1. **External Network Scanner** - Detect all Docker networks on system
-2. **Network Connection Manager** - Connect/disconnect Traefik to external networks
-3. **Cross-Stack Integration** - Enable external services to use Traefik
-4. **Network Topology UI** - Visual network management interface
+1. ✅ **External Network Scanner** - Detect all Docker networks on system with Traefik connection status
+2. ✅ **Network Connection Manager** - Connect/disconnect Traefik to external networks with validation
+3. ✅ **Cross-Stack Integration** - Enable external services to use Traefik through network management
+4. ✅ **Network Topology UI** - Visual network management interface with container relationships
+5. ✅ **Smart Route Validation** - Automatic network connectivity checks during route creation
 
-### 🔮 Phase 4: Network Map & Observability (FUTURE)
+### 🎯 Phase 4: Network Map & Observability (NEXT - HIGH PRIORITY)
 **Implementation Steps:**
 1. **Visual Network Topology** - Interactive domain → service → container flow
-2. **OpenTelemetry Integration** - Configure tracing backends and display traces
+2. **OpenTelemetry Integration** - Configure tracing backends and display traces (Reference: https://doc.traefik.io/traefik/observability/tracing/overview/)
 3. **Real-time Monitoring** - Live status, metrics, and health checking
 4. **Dependency Mapping** - Service relationship visualization from traces
 
-### 🔮 Phase 5: Observability & Logging Configuration (FUTURE)
+### 🎯 Phase 5: Observability & Logging Configuration (HIGH PRIORITY)
 **Implementation Steps:**
-1. **Graylog Integration UI** - Configure external log shipping
+1. **Graylog Integration UI** - Configure external log shipping (configurable endpoint/format)
 2. **Prometheus Setup** - Metrics endpoint configuration and info page
 3. **Tracing Configuration** - OpenTelemetry backend setup
 4. **Observability Dashboard** - Unified configuration management
 
-### 🔮 Phase 6: Remote Proxy Configuration (FUTURE)
+### 🎯 Phase 6: Remote Proxy Configuration (HIGH PRIORITY)
 **Implementation Steps:**
 1. **IP Forwarding Setup** - Configure trusted proxies and real IP detection
-2. **Proxy Scenario Presets** - CloudFlare, AWS ALB, nginx, HAProxy configurations
-3. **Security Configuration** - Rate limiting, access control, header policies
-4. **Real-time IP Testing** - Validate IP forwarding and detection
+2. **External IP Passing** - Ensure real client IPs reach containers (like nginx behavior)
+3. **Proxy Scenario Presets** - CloudFlare, AWS ALB, nginx, HAProxy configurations with explanations
+4. **Security Configuration** - Rate limiting, access control, header policies
+5. **Real-time IP Testing** - Validate IP forwarding and detection
 
 ## Key Technical Considerations
 

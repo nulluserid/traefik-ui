@@ -30,6 +30,7 @@
                 <button class="tab-btn" data-tab="add-route">Add Route</button>
                 <button class="tab-btn" data-tab="middleware">Middleware</button>
                 <button class="tab-btn" data-tab="dns-providers">DNS Providers</button>
+                <button class="tab-btn" data-tab="observability">Observability</button>
             </div>
             
             <div class="nav-group">
@@ -361,6 +362,208 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...
                     
                     <button type="submit" class="btn btn-primary">Add DNS Provider</button>
                 </form>
+            </div>
+        </div>
+
+        <div id="observability" class="tab-content">
+            <div class="section">
+                <h2>Observability Configuration</h2>
+                <p>Configure Traefik's logging, metrics, and tracing capabilities for comprehensive monitoring and observability.</p>
+            </div>
+            
+            <div class="section">
+                <h2>📊 Access Logs</h2>
+                <form id="access-logs-form" class="form">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enable-access-logs"> Enable Access Logging
+                        </label>
+                        <small>Enable detailed request logging for monitoring and analysis</small>
+                    </div>
+                    
+                    <div id="access-logs-options" class="conditional-section hidden">
+                        <div class="form-group">
+                            <label for="log-format">Log Format:</label>
+                            <select id="log-format">
+                                <option value="json">JSON (recommended for log aggregation)</option>
+                                <option value="clf">Common Log Format (CLF)</option>
+                                <option value="custom">Custom Format</option>
+                            </select>
+                            <small>Choose format based on your log processing requirements</small>
+                        </div>
+                        
+                        <div id="custom-format-section" class="hidden">
+                            <div class="form-group">
+                                <label for="custom-log-format">Custom Log Format:</label>
+                                <textarea id="custom-log-format" rows="3" placeholder="Custom format string using Traefik variables"></textarea>
+                                <small>Define custom log format using Traefik's log variables</small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="log-file-path">Log File Path:</label>
+                            <input type="text" id="log-file-path" value="/logs/access.log" placeholder="/logs/access.log">
+                            <small>File path for access logs (container path)</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>External Log Shipping:</label>
+                            <label>
+                                <input type="checkbox" id="enable-graylog"> Enable Graylog Integration
+                            </label>
+                            <small>Send logs to external Graylog server for centralized logging</small>
+                        </div>
+                        
+                        <div id="graylog-options" class="conditional-section hidden">
+                            <div class="form-group">
+                                <label for="graylog-endpoint">Graylog Endpoint:</label>
+                                <input type="text" id="graylog-endpoint" placeholder="graylog.company.com:12201">
+                                <small>Graylog GELF UDP endpoint (host:port)</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="graylog-facility">Facility:</label>
+                                <input type="text" id="graylog-facility" value="traefik" placeholder="traefik">
+                                <small>Facility name for log categorization</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Update Access Logs</button>
+                    <button type="button" id="test-log-config" class="btn btn-secondary">Test Configuration</button>
+                </form>
+            </div>
+            
+            <div class="section">
+                <h2>🔍 Prometheus Metrics</h2>
+                <form id="metrics-form" class="form">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enable-metrics"> Enable Prometheus Metrics
+                        </label>
+                        <small>Expose metrics endpoint for Prometheus scraping</small>
+                    </div>
+                    
+                    <div id="metrics-options" class="conditional-section hidden">
+                        <div class="form-group">
+                            <label for="metrics-port">Metrics Port:</label>
+                            <input type="number" id="metrics-port" value="8082" placeholder="8082">
+                            <small>Port for metrics endpoint (usually different from dashboard)</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="metrics-path">Metrics Path:</label>
+                            <input type="text" id="metrics-path" value="/metrics" placeholder="/metrics">
+                            <small>URL path for metrics endpoint</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="metrics-interval">Scrape Interval:</label>
+                            <select id="metrics-interval">
+                                <option value="10s">10 seconds</option>
+                                <option value="30s" selected>30 seconds</option>
+                                <option value="1m">1 minute</option>
+                                <option value="5m">5 minutes</option>
+                            </select>
+                            <small>How often Prometheus should scrape metrics</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Metrics Categories:</label>
+                            <div class="checkbox-group">
+                                <label><input type="checkbox" id="metrics-entrypoint" checked> EntryPoint Metrics</label>
+                                <label><input type="checkbox" id="metrics-router" checked> Router Metrics</label>
+                                <label><input type="checkbox" id="metrics-service" checked> Service Metrics</label>
+                            </div>
+                            <small>Select which metric categories to expose</small>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Update Metrics</button>
+                    <button type="button" id="test-metrics-endpoint" class="btn btn-secondary">Test Endpoint</button>
+                </form>
+                
+                <div id="metrics-info" class="info-section hidden">
+                    <h3>Prometheus Configuration</h3>
+                    <p>Add this job to your Prometheus configuration:</p>
+                    <pre id="prometheus-config-example"></pre>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>📈 OpenTelemetry Tracing</h2>
+                <form id="tracing-form" class="form">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enable-tracing"> Enable Distributed Tracing
+                        </label>
+                        <small>Enable OpenTelemetry tracing for request flow analysis</small>
+                    </div>
+                    
+                    <div id="tracing-options" class="conditional-section hidden">
+                        <div class="form-group">
+                            <label for="tracing-backend">Tracing Backend:</label>
+                            <select id="tracing-backend">
+                                <option value="jaeger">Jaeger</option>
+                                <option value="zipkin">Zipkin</option>
+                                <option value="otlp">OpenTelemetry Protocol (OTLP)</option>
+                            </select>
+                            <small>Choose your tracing backend system</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="tracing-endpoint">Tracing Endpoint:</label>
+                            <input type="text" id="tracing-endpoint" placeholder="http://jaeger:14268/api/traces">
+                            <small>Endpoint URL for sending traces</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="sampling-rate">Sampling Rate:</label>
+                            <input type="range" id="sampling-rate" min="0" max="1" step="0.1" value="1.0">
+                            <span id="sampling-rate-value">100%</span>
+                            <small>Percentage of requests to trace (1.0 = 100%, 0.1 = 10%)</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="service-name">Service Name:</label>
+                            <input type="text" id="service-name" value="traefik" placeholder="traefik">
+                            <small>Service name for trace identification</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="trace-headers">Trace Headers:</label>
+                            <textarea id="trace-headers" rows="3" placeholder="X-Trace-Id&#10;X-Span-Id"></textarea>
+                            <small>Additional headers to include in traces (one per line)</small>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Update Tracing</button>
+                    <button type="button" id="test-tracing-connection" class="btn btn-secondary">Test Connection</button>
+                </form>
+            </div>
+            
+            <div class="section">
+                <h2>⚙️ Configuration Status</h2>
+                <div id="observability-status" class="status-grid">
+                    <div class="status-card">
+                        <h4>📊 Access Logs</h4>
+                        <div id="logs-status" class="status-indicator">Not Configured</div>
+                    </div>
+                    <div class="status-card">
+                        <h4>🔍 Metrics</h4>
+                        <div id="metrics-status" class="status-indicator">Not Configured</div>
+                    </div>
+                    <div class="status-card">
+                        <h4>📈 Tracing</h4>
+                        <div id="tracing-status" class="status-indicator">Not Configured</div>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button id="load-observability-config" class="btn btn-secondary">Load Current Config</button>
+                    <button id="export-observability-config" class="btn btn-secondary">Export Config</button>
+                    <button id="restart-traefik-observability" class="btn btn-warning">Apply & Restart Traefik</button>
+                </div>
             </div>
         </div>
 

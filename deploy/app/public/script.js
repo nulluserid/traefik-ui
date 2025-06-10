@@ -76,6 +76,27 @@ class TraefikUI {
         document.getElementById('refresh-domains').addEventListener('click', () => this.refreshDomains());
         document.getElementById('domain-filter').addEventListener('change', (e) => this.filterDomains(e.target.value));
 
+        // Observability Event Listeners
+        document.getElementById('enable-access-logs').addEventListener('change', (e) => this.toggleAccessLogsOptions(e.target.checked));
+        document.getElementById('log-format').addEventListener('change', (e) => this.handleLogFormatChange(e.target.value));
+        document.getElementById('enable-graylog').addEventListener('change', (e) => this.toggleGraylogOptions(e.target.checked));
+        document.getElementById('enable-metrics').addEventListener('change', (e) => this.toggleMetricsOptions(e.target.checked));
+        document.getElementById('enable-tracing').addEventListener('change', (e) => this.toggleTracingOptions(e.target.checked));
+        document.getElementById('tracing-backend').addEventListener('change', (e) => this.handleTracingBackendChange(e.target.value));
+        document.getElementById('sampling-rate').addEventListener('input', (e) => this.updateSamplingRateDisplay(e.target.value));
+        
+        document.getElementById('access-logs-form').addEventListener('submit', (e) => this.handleAccessLogsSubmit(e));
+        document.getElementById('metrics-form').addEventListener('submit', (e) => this.handleMetricsSubmit(e));
+        document.getElementById('tracing-form').addEventListener('submit', (e) => this.handleTracingSubmit(e));
+        
+        document.getElementById('test-log-config').addEventListener('click', () => this.testLogConfiguration());
+        document.getElementById('test-metrics-endpoint').addEventListener('click', () => this.testMetricsEndpoint());
+        document.getElementById('test-tracing-connection').addEventListener('click', () => this.testTracingConnection());
+        
+        document.getElementById('load-observability-config').addEventListener('click', () => this.loadObservabilityConfig());
+        document.getElementById('export-observability-config').addEventListener('click', () => this.exportObservabilityConfig());
+        document.getElementById('restart-traefik-observability').addEventListener('click', () => this.restartTraefikForObservability());
+
         document.querySelectorAll('.template-card').forEach(card => {
             card.addEventListener('click', () => this.useTemplate(card.dataset.template));
         });
@@ -1753,6 +1774,400 @@ networks:
                 resolve(false);
             };
         });
+    }
+
+    // Phase 5: Observability Configuration Methods
+
+    toggleAccessLogsOptions(enabled) {
+        const options = document.getElementById('access-logs-options');
+        if (enabled) {
+            options.classList.remove('hidden');
+        } else {
+            options.classList.add('hidden');
+        }
+    }
+
+    handleLogFormatChange(format) {
+        const customSection = document.getElementById('custom-format-section');
+        if (format === 'custom') {
+            customSection.classList.remove('hidden');
+        } else {
+            customSection.classList.add('hidden');
+        }
+    }
+
+    toggleGraylogOptions(enabled) {
+        const options = document.getElementById('graylog-options');
+        if (enabled) {
+            options.classList.remove('hidden');
+        } else {
+            options.classList.add('hidden');
+        }
+    }
+
+    toggleMetricsOptions(enabled) {
+        const options = document.getElementById('metrics-options');
+        const infoSection = document.getElementById('metrics-info');
+        
+        if (enabled) {
+            options.classList.remove('hidden');
+            infoSection.classList.remove('hidden');
+            this.updatePrometheusConfigExample();
+        } else {
+            options.classList.add('hidden');
+            infoSection.classList.add('hidden');
+        }
+    }
+
+    toggleTracingOptions(enabled) {
+        const options = document.getElementById('tracing-options');
+        if (enabled) {
+            options.classList.remove('hidden');
+            this.handleTracingBackendChange(document.getElementById('tracing-backend').value);
+        } else {
+            options.classList.add('hidden');
+        }
+    }
+
+    handleTracingBackendChange(backend) {
+        const endpointInput = document.getElementById('tracing-endpoint');
+        
+        // Set default endpoint based on backend
+        switch (backend) {
+            case 'jaeger':
+                endpointInput.placeholder = 'http://jaeger:14268/api/traces';
+                break;
+            case 'zipkin':
+                endpointInput.placeholder = 'http://zipkin:9411/api/v2/spans';
+                break;
+            case 'otlp':
+                endpointInput.placeholder = 'http://otel-collector:4318/v1/traces';
+                break;
+        }
+    }
+
+    updateSamplingRateDisplay(value) {
+        const display = document.getElementById('sampling-rate-value');
+        display.textContent = `${Math.round(value * 100)}%`;
+    }
+
+    updatePrometheusConfigExample() {
+        const port = document.getElementById('metrics-port').value || '8082';
+        const path = document.getElementById('metrics-path').value || '/metrics';
+        const interval = document.getElementById('metrics-interval').value || '30s';
+        
+        const config = `job_name: 'traefik'
+static_configs:
+  - targets: ['traefik:${port}']
+metrics_path: '${path}'
+scrape_interval: ${interval}
+scrape_timeout: 10s`;
+        
+        document.getElementById('prometheus-config-example').textContent = config;
+    }
+
+    async handleAccessLogsSubmit(e) {
+        e.preventDefault();
+        
+        const enabled = document.getElementById('enable-access-logs').checked;
+        const format = document.getElementById('log-format').value;
+        const filePath = document.getElementById('log-file-path').value;
+        const customFormat = document.getElementById('custom-log-format').value;
+        const graylogEnabled = document.getElementById('enable-graylog').checked;
+        const graylogEndpoint = document.getElementById('graylog-endpoint').value;
+        const graylogFacility = document.getElementById('graylog-facility').value;
+
+        const config = {
+            enabled,
+            format,
+            filePath,
+            customFormat,
+            graylog: {
+                enabled: graylogEnabled,
+                endpoint: graylogEndpoint,
+                facility: graylogFacility
+            }
+        };
+
+        try {
+            const response = await fetch('/api/observability/logs', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+
+            if (response.ok) {
+                this.showNotification('Access logs configuration updated successfully!', 'success');
+                this.updateObservabilityStatus('logs', enabled ? 'Configured' : 'Disabled');
+            } else {
+                throw new Error('Failed to update access logs configuration');
+            }
+        } catch (error) {
+            this.showNotification('Failed to update access logs configuration', 'error');
+        }
+    }
+
+    async handleMetricsSubmit(e) {
+        e.preventDefault();
+        
+        const enabled = document.getElementById('enable-metrics').checked;
+        const port = parseInt(document.getElementById('metrics-port').value) || 8082;
+        const path = document.getElementById('metrics-path').value || '/metrics';
+        const interval = document.getElementById('metrics-interval').value;
+        
+        const categories = {
+            entrypoint: document.getElementById('metrics-entrypoint').checked,
+            router: document.getElementById('metrics-router').checked,
+            service: document.getElementById('metrics-service').checked
+        };
+
+        const config = {
+            enabled,
+            port,
+            path,
+            interval,
+            categories
+        };
+
+        try {
+            const response = await fetch('/api/observability/metrics', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                this.showNotification('Metrics configuration updated successfully!', 'success');
+                this.updateObservabilityStatus('metrics', enabled ? `Enabled on :${port}` : 'Disabled');
+                
+                if (enabled && result.metricsUrl) {
+                    console.log('Metrics endpoint:', result.metricsUrl);
+                }
+            } else {
+                throw new Error('Failed to update metrics configuration');
+            }
+        } catch (error) {
+            this.showNotification('Failed to update metrics configuration', 'error');
+        }
+    }
+
+    async handleTracingSubmit(e) {
+        e.preventDefault();
+        
+        const enabled = document.getElementById('enable-tracing').checked;
+        const backend = document.getElementById('tracing-backend').value;
+        const endpoint = document.getElementById('tracing-endpoint').value;
+        const samplingRate = parseFloat(document.getElementById('sampling-rate').value);
+        const serviceName = document.getElementById('service-name').value || 'traefik';
+        const headers = document.getElementById('trace-headers').value;
+
+        const config = {
+            enabled,
+            backend,
+            endpoint,
+            samplingRate,
+            serviceName,
+            headers
+        };
+
+        try {
+            const response = await fetch('/api/observability/tracing', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+
+            if (response.ok) {
+                this.showNotification('Tracing configuration updated successfully!', 'success');
+                this.updateObservabilityStatus('tracing', enabled ? `${backend} (${Math.round(samplingRate * 100)}%)` : 'Disabled');
+            } else {
+                throw new Error('Failed to update tracing configuration');
+            }
+        } catch (error) {
+            this.showNotification('Failed to update tracing configuration', 'error');
+        }
+    }
+
+    async testLogConfiguration() {
+        const graylogEnabled = document.getElementById('enable-graylog').checked;
+        const graylogEndpoint = document.getElementById('graylog-endpoint').value;
+        
+        if (!graylogEnabled || !graylogEndpoint) {
+            this.showNotification('No external log configuration to test', 'info');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/observability/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'graylog',
+                    config: { endpoint: graylogEndpoint }
+                })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                this.showNotification('Graylog configuration test successful!', 'success');
+            } else {
+                this.showNotification(`Graylog test failed: ${result.message}`, 'error');
+            }
+        } catch (error) {
+            this.showNotification('Failed to test log configuration', 'error');
+        }
+    }
+
+    async testMetricsEndpoint() {
+        const port = document.getElementById('metrics-port').value || '8082';
+        const path = document.getElementById('metrics-path').value || '/metrics';
+        
+        try {
+            const response = await fetch('/api/observability/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'metrics',
+                    config: { port, path }
+                })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                this.showNotification(`Metrics endpoint test successful: ${result.details.url}`, 'success');
+            } else {
+                this.showNotification(`Metrics test failed: ${result.message}`, 'error');
+            }
+        } catch (error) {
+            this.showNotification('Failed to test metrics endpoint', 'error');
+        }
+    }
+
+    async testTracingConnection() {
+        const backend = document.getElementById('tracing-backend').value;
+        const endpoint = document.getElementById('tracing-endpoint').value;
+        
+        if (!endpoint) {
+            this.showNotification('Please enter a tracing endpoint', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/observability/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'tracing',
+                    config: { backend, endpoint }
+                })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                this.showNotification(`${backend} connection test successful!`, 'success');
+            } else {
+                this.showNotification(`${backend} test failed: ${result.message}`, 'error');
+            }
+        } catch (error) {
+            this.showNotification('Failed to test tracing connection', 'error');
+        }
+    }
+
+    async loadObservabilityConfig() {
+        try {
+            const response = await fetch('/api/observability/config');
+            const config = await response.json();
+            
+            // Load access logs configuration
+            document.getElementById('enable-access-logs').checked = config.accessLogs.enabled;
+            document.getElementById('log-format').value = config.accessLogs.format;
+            document.getElementById('log-file-path').value = config.accessLogs.filePath;
+            this.toggleAccessLogsOptions(config.accessLogs.enabled);
+            
+            if (config.accessLogs.graylog) {
+                document.getElementById('enable-graylog').checked = true;
+                document.getElementById('graylog-endpoint').value = config.accessLogs.graylog.endpoint || '';
+                document.getElementById('graylog-facility').value = config.accessLogs.graylog.facility || 'traefik';
+                this.toggleGraylogOptions(true);
+            }
+            
+            // Load metrics configuration
+            document.getElementById('enable-metrics').checked = config.metrics.enabled;
+            document.getElementById('metrics-port').value = config.metrics.port;
+            document.getElementById('metrics-path').value = config.metrics.path;
+            document.getElementById('metrics-entrypoint').checked = config.metrics.categories.entrypoint;
+            document.getElementById('metrics-router').checked = config.metrics.categories.router;
+            document.getElementById('metrics-service').checked = config.metrics.categories.service;
+            this.toggleMetricsOptions(config.metrics.enabled);
+            
+            // Load tracing configuration
+            document.getElementById('enable-tracing').checked = config.tracing.enabled;
+            document.getElementById('tracing-backend').value = config.tracing.backend;
+            document.getElementById('tracing-endpoint').value = config.tracing.endpoint;
+            document.getElementById('sampling-rate').value = config.tracing.samplingRate;
+            document.getElementById('service-name').value = config.tracing.serviceName;
+            document.getElementById('trace-headers').value = config.tracing.headers;
+            this.toggleTracingOptions(config.tracing.enabled);
+            this.updateSamplingRateDisplay(config.tracing.samplingRate);
+            
+            // Update status indicators
+            this.updateObservabilityStatus('logs', config.accessLogs.enabled ? 'Configured' : 'Disabled');
+            this.updateObservabilityStatus('metrics', config.metrics.enabled ? `Enabled on :${config.metrics.port}` : 'Disabled');
+            this.updateObservabilityStatus('tracing', config.tracing.enabled ? `${config.tracing.backend} (${Math.round(config.tracing.samplingRate * 100)}%)` : 'Disabled');
+            
+            this.showNotification('Observability configuration loaded successfully!', 'success');
+        } catch (error) {
+            this.showNotification('Failed to load observability configuration', 'error');
+        }
+    }
+
+    updateObservabilityStatus(type, status) {
+        const statusElement = document.getElementById(`${type}-status`);
+        if (statusElement) {
+            statusElement.textContent = status;
+            statusElement.className = `status-indicator ${status.toLowerCase().includes('disabled') ? 'disabled' : 'enabled'}`;
+        }
+    }
+
+    async exportObservabilityConfig() {
+        try {
+            const response = await fetch('/api/observability/config');
+            const config = await response.json();
+            
+            const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'traefik-observability-config.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            this.showNotification('Observability configuration exported successfully!', 'success');
+        } catch (error) {
+            this.showNotification('Failed to export observability configuration', 'error');
+        }
+    }
+
+    async restartTraefikForObservability() {
+        if (!confirm('Restart Traefik to apply observability changes? This may cause temporary downtime.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/restart', { method: 'POST' });
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showNotification('Traefik restarted successfully! Observability changes applied.', 'success');
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            this.showNotification('Failed to restart Traefik', 'error');
+        }
     }
 
     // Phase 4: Domain Overview Methods
