@@ -114,6 +114,7 @@ class TraefikUI {
         
         document.getElementById('create-manual-backup').addEventListener('click', () => this.createManualBackup());
         document.getElementById('refresh-backup-list').addEventListener('click', () => this.refreshBackupList());
+        document.getElementById('download-all-backups').addEventListener('click', () => this.downloadAllBackups());
         document.getElementById('cleanup-old-backups').addEventListener('click', () => this.cleanupOldBackups());
         document.getElementById('confirm-create-backup').addEventListener('click', () => this.confirmCreateBackup());
         document.getElementById('cancel-create-backup').addEventListener('click', () => this.cancelCreateBackup());
@@ -2938,6 +2939,9 @@ scrape_timeout: 10s`;
                             <button class="btn btn-sm btn-primary" onclick="ui.restoreBackup('${backup.filename}', '${backup.created}', '${backup.version}', '${backup.type}')">
                                 🔄 Restore
                             </button>
+                            <button class="btn btn-sm btn-secondary" onclick="ui.downloadBackup('${backup.filename}')">
+                                📥 Download
+                            </button>
                             <button class="btn btn-sm btn-warning" onclick="ui.deleteBackup('${backup.filename}')">
                                 🗑️ Delete
                             </button>
@@ -3028,6 +3032,75 @@ scrape_timeout: 10s`;
         
         // This would update the UI configuration with the new system settings
         this.showNotification('System settings saved successfully', 'success');
+    }
+
+    downloadBackup(filename) {
+        try {
+            // Create download URL
+            const downloadUrl = `/api/config/ui/backups/${encodeURIComponent(filename)}/download`;
+            
+            // Trigger download by opening the URL
+            window.open(downloadUrl, '_blank');
+            
+            this.showNotification(`Downloading backup: ${filename}`, 'success');
+        } catch (error) {
+            console.error('Download error:', error);
+            this.showNotification('Failed to download backup', 'error');
+        }
+    }
+
+    async downloadAllBackups() {
+        try {
+            // Get all available backups
+            const response = await fetch('/api/config/ui/backups');
+            const result = await response.json();
+            
+            if (!result.backups || result.backups.length === 0) {
+                this.showNotification('No backups available to download', 'warning');
+                return;
+            }
+            
+            if (!confirm(`This will download ${result.backups.length} backup files. Continue?`)) {
+                return;
+            }
+            
+            // Download each backup with a small delay to avoid overwhelming the browser
+            let downloadCount = 0;
+            for (const backup of result.backups) {
+                setTimeout(() => {
+                    this.downloadBackup(backup.filename);
+                }, downloadCount * 500); // 500ms delay between downloads
+                downloadCount++;
+            }
+            
+            this.showNotification(`Initiated download of ${result.backups.length} backup files`, 'success');
+        } catch (error) {
+            console.error('Download all error:', error);
+            this.showNotification('Failed to download all backups', 'error');
+        }
+    }
+
+    async deleteBackup(filename) {
+        if (!confirm(`Are you sure you want to delete backup "${filename}"? This action cannot be undone.`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/config/ui/backups/${encodeURIComponent(filename)}`, {
+                method: 'DELETE'
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showNotification(`Backup deleted: ${filename}`, 'success');
+                this.refreshBackupList();
+            } else {
+                this.showNotification(`Failed to delete backup: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            this.showNotification('Failed to delete backup', 'error');
+        }
     }
 
     async loadSystemConfigStatus() {

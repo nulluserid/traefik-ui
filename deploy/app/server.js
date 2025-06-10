@@ -1836,6 +1836,87 @@ app.post('/api/config/ui/backup', (req, res) => {
   }
 });
 
+// Download specific backup file
+app.get('/api/config/ui/backups/:filename/download', (req, res) => {
+  try {
+    const { filename } = req.params;
+    const backupPath = path.join(UI_BACKUPS_DIR, filename);
+    
+    if (!fs.existsSync(backupPath)) {
+      return res.status(404).json({ error: 'Backup file not found' });
+    }
+    
+    // Validate filename to prevent directory traversal
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
+    
+    // Ensure file is a YAML backup
+    if (!filename.endsWith('.yml') && !filename.endsWith('.yaml')) {
+      return res.status(400).json({ error: 'Invalid backup file format' });
+    }
+    
+    // Set headers for download
+    res.setHeader('Content-Type', 'application/x-yaml');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', fs.statSync(backupPath).size);
+    
+    // Stream the file
+    const fileStream = fs.createReadStream(backupPath);
+    fileStream.pipe(res);
+    
+  } catch (error) {
+    console.error('Backup download error:', error);
+    res.status(500).json({ error: 'Failed to download backup file' });
+  }
+});
+
+// Delete specific backup file
+app.delete('/api/config/ui/backups/:filename', (req, res) => {
+  try {
+    const { filename } = req.params;
+    const backupPath = path.join(UI_BACKUPS_DIR, filename);
+    
+    // Validate filename to prevent directory traversal
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
+    
+    // Ensure file is a YAML backup
+    if (!filename.endsWith('.yml') && !filename.endsWith('.yaml')) {
+      return res.status(400).json({ error: 'Invalid backup file format' });
+    }
+    
+    if (!fs.existsSync(backupPath)) {
+      return res.status(404).json({ error: 'Backup file not found' });
+    }
+    
+    // Prevent deletion of very recent backups (safety check)
+    const stats = fs.statSync(backupPath);
+    const fileAge = Date.now() - stats.mtime.getTime();
+    const fiveMinutesInMs = 5 * 60 * 1000;
+    
+    if (fileAge < fiveMinutesInMs && filename.includes('pre-restore')) {
+      return res.status(400).json({ 
+        error: 'Cannot delete recent pre-restore backup (safety protection)',
+        ageMinutes: Math.round(fileAge / 60000)
+      });
+    }
+    
+    // Delete the backup file
+    fs.unlinkSync(backupPath);
+    
+    res.json({ 
+      success: true, 
+      message: `Backup ${filename} deleted successfully` 
+    });
+    
+  } catch (error) {
+    console.error('Backup deletion error:', error);
+    res.status(500).json({ error: 'Failed to delete backup file' });
+  }
+});
+
 // List available backups
 app.get('/api/config/ui/backups', (req, res) => {
   try {
