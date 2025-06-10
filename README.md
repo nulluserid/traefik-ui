@@ -7,41 +7,48 @@ A simple web interface for managing Traefik proxy configurations without manuall
 ## Features
 
 - **Visual Configuration Management**: View current routes and services in a clean interface
+- **DNS Provider Management**: Named TSIG configurations for RFC2136 DNS challenges with reusable settings
 - **CrowdSec Integration**: Complete middleware management for CrowdSec bouncer plugin with AppSec support
 - **System Theme Support**: Automatic dark/light theme detection with manual toggle
-- **Guided Templates**: Pre-configured templates for common scenarios (HTTP, HTTPS with Let's Encrypt, internal services)
+- **Enhanced TLS Options**: HTTP vs DNS challenge selection with Let's Encrypt integration
+- **Custom Certificate Support**: Upload PEM certificates with validation and automatic configuration
 - **Form-Based Route Creation**: Easy forms to add new proxy routes with middleware selection
-- **Enhanced TSIG Support**: Multiple algorithm support for RFC2136 DNS challenges
-- **Middleware Management**: Create, configure, and assign CrowdSec protection to routes
-- **TLS Configuration**: Support for Let's Encrypt production/staging and custom certificate upload
+- **Template System**: Pre-configured templates for common scenarios
+- **One-Click Deployment**: Complete Docker Compose setup with automated installation script
 - **Service Management**: Automatically create backend services when adding routes
 - **Restart Integration**: Restart Traefik directly from the UI
 
 ## Quick Start
 
-1. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+**For production deployment, use the complete deployment package:**
 
-2. **Configure environment variables:**
-   ```bash
-   export TRAEFIK_CONFIG=/path/to/traefik.yml
-   export DYNAMIC_CONFIG=/path/to/dynamic.yml
-   export RESTART_COMMAND="docker restart traefik"
-   ```
+```bash
+# Download the repository
+git clone https://github.com/nulluserid/traefik-ui.git
+cd traefik-ui/deploy
 
-3. **Start the server:**
-   ```bash
-   npm start
-   # or for development with auto-restart:
-   npm run dev
-   ```
+# Run the automated setup
+./setup.sh
 
-4. **Open in browser:**
-   ```
-   http://localhost:3000
-   ```
+# Access the interfaces
+# Traefik Dashboard: http://localhost:8080
+# Traefik UI:        http://localhost:3000
+```
+
+**For development:**
+
+```bash
+# Install dependencies
+npm install
+
+# Configure environment variables
+export TRAEFIK_CONFIG=/path/to/traefik.yml
+export DYNAMIC_CONFIG=/path/to/dynamic.yml
+export RESTART_COMMAND="docker restart traefik"
+
+# Start development server
+npm run dev
+```
 
 ## Configuration
 
@@ -168,6 +175,12 @@ For automatic SSL certificates via DNS challenge:
 - `POST /api/service` - Add new service
 - `DELETE /api/router/:name` - Delete route
 - `POST /api/restart` - Restart Traefik
+- `GET /api/dns-providers` - List DNS providers
+- `POST /api/dns-providers` - Add DNS provider
+- `DELETE /api/dns-providers/:name` - Delete DNS provider
+- `POST /api/dns-providers/:name/test` - Test DNS provider
+- `POST /api/certificate` - Upload custom certificate
+- `DELETE /api/certificate/:hostname` - Delete custom certificate
 
 ## Security Considerations
 

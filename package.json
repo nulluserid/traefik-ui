@@ -1,11 +1,12 @@
 {
   "name": "traefik-ui",
   "version": "0.0.3",
-  "description": "Simple web UI for managing Traefik configurations",
-  "main": "server.js",
+  "description": "Web UI for managing Traefik proxy configurations with DNS provider management and CrowdSec integration",
+  "main": "deploy/app/server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "cd deploy/app && node server.js",
+    "dev": "cd deploy/app && nodemon server.js",
+    "deploy": "cd deploy && ./setup.sh"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -14,5 +15,25 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "traefik",
+    "proxy",
+    "reverse-proxy",
+    "docker",
+    "letsencrypt",
+    "dns-challenge",
+    "rfc2136",
+    "crowdsec",
+    "web-ui",
+    "configuration-management"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nulluserid/traefik-ui.git"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
