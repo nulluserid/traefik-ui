@@ -102,7 +102,7 @@
                 <form id="route-form" class="form">
                     <div class="form-group">
                         <label for="route-name">Route Name:</label>
-                        <input type="text" id="route-name" required placeholder="e.g., my-app">
+                        <input type="text" id="route-name" name="route-name" required placeholder="e.g., my-app">
                     </div>
                     
                     <div class="form-group">
@@ -139,7 +139,7 @@
                             <!-- Populated dynamically from saved providers -->
                         </select>
                         <div class="dns-provider-help">
-                            <small>💡 <a href="#" onclick="switchTab('dns-providers')">Manage DNS Providers</a> to add RFC2136/TSIG configurations</small>
+                            <small>💡 <a href="#" onclick="window.ui.switchTab('dns-providers')">Manage DNS Providers</a> to add RFC2136/TSIG configurations</small>
                         </div>
                     </div>
                     
@@ -1240,6 +1240,7 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...
     <script src="js/network-manager.js"></script>
     <script src="js/observability.js"></script>
     <script src="js/proxy-config.js"></script>
+    <script src="js/system-config.js"></script>
     <script src="js/traefik-ui.js"></script>
 </body>
 </html>

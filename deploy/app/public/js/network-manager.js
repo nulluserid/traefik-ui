@@ -301,7 +301,7 @@ class TraefikNetworkManager {
     }
 
     displayDockerNetworks(networks) {
-        const container = TraefikUtils.getElement('docker-networks-list');
+        const container = TraefikUtils.getElement('docker-networks');
         if (!container) return;
         
         if (networks.length === 0) {
@@ -362,7 +362,7 @@ class TraefikNetworkManager {
     }
 
     displayNetworkManagement(networks) {
-        const container = TraefikUtils.getElement('network-management-list');
+        const container = TraefikUtils.getElement('available-networks');
         if (!container) return;
         
         if (networks.length === 0) {
@@ -457,7 +457,7 @@ class TraefikNetworkManager {
     }
 
     filterNetworks(filter) {
-        const table = TraefikUtils.getElement('network-management-list')?.querySelector('table');
+        const table = TraefikUtils.getElement('available-networks')?.querySelector('table');
         if (!table) return;
 
         TraefikUIComponents.filterTableRows(table, (index, row) => {

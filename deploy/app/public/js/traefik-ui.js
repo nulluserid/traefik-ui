@@ -50,6 +50,7 @@ class TraefikUI {
         this.network = new TraefikNetworkManager(this);
         this.observability = new TraefikObservability(this);
         this.proxy = new TraefikProxyConfig(this);
+        this.system = new TraefikSystemConfig(this);
         
         // Make modules globally accessible for onclick handlers
         window.traefikUI = {
@@ -57,7 +58,8 @@ class TraefikUI {
             core: this.core,
             network: this.network,
             observability: this.observability,
-            proxy: this.proxy
+            proxy: this.proxy,
+            system: this.system
         };
     }
 
@@ -91,6 +93,9 @@ class TraefikUI {
         
         // Proxy Configuration Event Listeners
         this.setupProxyEventListeners();
+        
+        // System Configuration Event Listeners
+        this.setupSystemEventListeners();
     }
 
     setupCoreEventListeners() {
@@ -317,6 +322,22 @@ class TraefikUI {
         if (testTracingConnection) {
             testTracingConnection.addEventListener('click', () => this.observability.testTracingConnection());
         }
+
+        // Load/Export/Restart observability buttons
+        const loadObservabilityConfig = TraefikUtils.getElement('load-observability-config', false);
+        if (loadObservabilityConfig) {
+            loadObservabilityConfig.addEventListener('click', () => this.observability.loadObservabilityConfig());
+        }
+
+        const exportObservabilityConfig = TraefikUtils.getElement('export-observability-config', false);
+        if (exportObservabilityConfig) {
+            exportObservabilityConfig.addEventListener('click', () => this.observability.exportObservabilityConfig());
+        }
+
+        const restartTraefikObservability = TraefikUtils.getElement('restart-traefik-observability', false);
+        if (restartTraefikObservability) {
+            restartTraefikObservability.addEventListener('click', () => this.observability.restartTraefikWithObservability());
+        }
     }
 
     setupProxyEventListeners() {
@@ -350,6 +371,213 @@ class TraefikUI {
         if (exportProxyConfig) {
             exportProxyConfig.addEventListener('click', () => this.proxy.exportProxyConfig());
         }
+    }
+
+    setupSystemEventListeners() {
+        // System Config Event Listeners
+        const loadConfigViewer = TraefikUtils.getElement('load-config-viewer', false);
+        if (loadConfigViewer) {
+            loadConfigViewer.addEventListener('click', () => this.system.loadConfigViewer());
+        }
+
+        const refreshConfigViewer = TraefikUtils.getElement('refresh-config-viewer', false);
+        if (refreshConfigViewer) {
+            refreshConfigViewer.addEventListener('click', () => this.system.refreshConfigViewer());
+        }
+
+        const validateCurrentConfig = TraefikUtils.getElement('validate-current-config', false);
+        if (validateCurrentConfig) {
+            validateCurrentConfig.addEventListener('click', () => this.system.validateCurrentConfig());
+        }
+
+        const toggleConfigEditor = TraefikUtils.getElement('toggle-config-editor', false);
+        if (toggleConfigEditor) {
+            toggleConfigEditor.addEventListener('click', () => this.system.toggleConfigEditor());
+        }
+
+        const saveConfigChanges = TraefikUtils.getElement('save-config-changes', false);
+        if (saveConfigChanges) {
+            saveConfigChanges.addEventListener('click', () => this.system.saveConfigChanges());
+        }
+
+        const cancelConfigEdit = TraefikUtils.getElement('cancel-config-edit', false);
+        if (cancelConfigEdit) {
+            cancelConfigEdit.addEventListener('click', () => this.system.cancelConfigEdit());
+        }
+
+        const validateConfigEdit = TraefikUtils.getElement('validate-config-edit', false);
+        if (validateConfigEdit) {
+            validateConfigEdit.addEventListener('click', () => this.system.validateConfigEdit());
+        }
+
+        const exportConfig = TraefikUtils.getElement('export-config', false);
+        if (exportConfig) {
+            exportConfig.addEventListener('click', () => this.system.exportConfig());
+        }
+
+        const selectConfigFile = TraefikUtils.getElement('select-config-file', false);
+        if (selectConfigFile) {
+            selectConfigFile.addEventListener('click', () => this.system.selectConfigFile());
+        }
+
+        const validateImport = TraefikUtils.getElement('validate-import', false);
+        if (validateImport) {
+            validateImport.addEventListener('click', () => this.system.validateImport());
+        }
+
+        const applyImport = TraefikUtils.getElement('apply-import', false);
+        if (applyImport) {
+            applyImport.addEventListener('click', () => this.system.applyImport());
+        }
+
+        const createManualBackup = TraefikUtils.getElement('create-manual-backup', false);
+        if (createManualBackup) {
+            createManualBackup.addEventListener('click', () => this.system.createManualBackup());
+        }
+
+        const refreshBackupList = TraefikUtils.getElement('refresh-backup-list', false);
+        if (refreshBackupList) {
+            refreshBackupList.addEventListener('click', () => this.system.refreshBackupList());
+        }
+
+        const confirmCreateBackup = TraefikUtils.getElement('confirm-create-backup', false);
+        if (confirmCreateBackup) {
+            confirmCreateBackup.addEventListener('click', () => this.system.confirmCreateBackup());
+        }
+
+        const cancelCreateBackup = TraefikUtils.getElement('cancel-create-backup', false);
+        if (cancelCreateBackup) {
+            cancelCreateBackup.addEventListener('click', () => this.system.cancelCreateBackup());
+        }
+
+        const systemSettingsForm = TraefikUtils.getElement('system-settings-form', false);
+        if (systemSettingsForm) {
+            systemSettingsForm.addEventListener('submit', (e) => this.system.handleSystemSettingsSubmit(e));
+        }
+
+        const configFileInput = TraefikUtils.getElement('config-file-input', false);
+        if (configFileInput) {
+            configFileInput.addEventListener('change', (e) => this.system.handleFileInputChange(e));
+        }
+
+        // Additional backup management buttons
+        const downloadAllBackups = TraefikUtils.getElement('download-all-backups', false);
+        if (downloadAllBackups) {
+            downloadAllBackups.addEventListener('click', () => this.system.downloadAllBackups());
+        }
+
+        const cleanupOldBackups = TraefikUtils.getElement('cleanup-old-backups', false);
+        if (cleanupOldBackups) {
+            cleanupOldBackups.addEventListener('click', () => this.system.cleanupOldBackups());
+        }
+
+        // Restore modal handlers
+        const closeRestoreModal = TraefikUtils.getElement('close-restore-modal', false);
+        if (closeRestoreModal) {
+            closeRestoreModal.addEventListener('click', () => this.system.closeRestoreModal());
+        }
+
+        const confirmRestore = TraefikUtils.getElement('confirm-restore', false);
+        if (confirmRestore) {
+            confirmRestore.addEventListener('click', () => this.system.confirmRestore());
+        }
+
+        const cancelRestore = TraefikUtils.getElement('cancel-restore', false);
+        if (cancelRestore) {
+            cancelRestore.addEventListener('click', () => this.system.cancelRestore());
+        }
+        
+        // Template button event listeners
+        this.setupTemplateEventListeners();
+    }
+
+    setupTemplateEventListeners() {
+        // Route templates event listeners
+        document.querySelectorAll('.template-card[data-template]').forEach(card => {
+            const button = card.querySelector('button');
+            if (button) {
+                button.addEventListener('click', () => {
+                    const templateName = card.dataset.template;
+                    this.core.useTemplate(templateName);
+                });
+            }
+        });
+
+        // Label templates event listeners  
+        document.querySelectorAll('.label-template-card[data-template]').forEach(card => {
+            const button = card.querySelector('button');
+            if (button) {
+                button.addEventListener('click', () => {
+                    const templateName = card.dataset.template;
+                    this.useLabelTemplate(templateName);
+                });
+            }
+        });
+    }
+
+    /**
+     * Template Helpers
+     */
+    useLabelTemplate(templateName) {
+        this.switchTab('label-generator');
+        
+        const templates = {
+            'simple-web-app': {
+                'label-service-name': 'webapp',
+                'label-hostname': 'app.example.com',
+                'label-port': '3000',
+                'label-enable-tls': true,
+                'label-tls-method': 'letsencrypt-http'
+            },
+            'api-service': {
+                'label-service-name': 'api',
+                'label-hostname': 'api.example.com',
+                'label-port': '8080',
+                'label-path': '/api',
+                'label-enable-tls': true,
+                'label-tls-method': 'letsencrypt-dns'
+            },
+            'protected-service': {
+                'label-service-name': 'protected',
+                'label-hostname': 'secure.example.com',
+                'label-port': '3000',
+                'label-enable-tls': true,
+                'label-tls-method': 'letsencrypt-dns',
+                'label-enable-crowdsec': true
+            },
+            'development-service': {
+                'label-service-name': 'devapp',
+                'label-hostname': 'dev.example.com',
+                'label-port': '3000',
+                'label-ignore-tls-errors': true
+            }
+        };
+        
+        const template = templates[templateName];
+        if (!template) {
+            TraefikUtils.showNotification('Template not found', 'error');
+            return;
+        }
+
+        // Populate form fields
+        Object.entries(template).forEach(([key, value]) => {
+            const element = TraefikUtils.getElement(key, false);
+            if (element) {
+                if (element.type === 'checkbox') {
+                    element.checked = value;
+                    // Trigger change event for checkbox toggles
+                    element.dispatchEvent(new Event('change'));
+                } else {
+                    element.value = value;
+                    // Trigger change event for select elements
+                    if (element.tagName === 'SELECT') {
+                        element.dispatchEvent(new Event('change'));
+                    }
+                }
+            }
+        });
+
+        TraefikUtils.showNotification(`Label template "${templateName}" applied`, 'success');
     }
 
     /**
@@ -428,6 +656,11 @@ class TraefikUI {
                     });
                 }
                 this.proxy.displayProxyPresets();
+                break;
+            case 'system-config':
+                // Load system configuration status
+                this.system.loadSystemStatus();
+                this.system.refreshBackupList();
                 break;
         }
     }
@@ -552,7 +785,7 @@ class TraefikUI {
     }
 
     updateSamplingRateDisplay(value) {
-        const display = TraefikUtils.getElement('sampling-rate-display', false);
+        const display = TraefikUtils.getElement('sampling-rate-value', false);
         if (display) {
             display.textContent = `${Math.round(value * 100)}%`;
         }

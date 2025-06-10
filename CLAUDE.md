@@ -20,7 +20,29 @@ This file provides comprehensive guidance to Claude Code (claude.ai/code) when w
 - **Phase Count:** 6 phases completed (Label Generator through Remote Proxy Config)
 - **Bug Fix Count:** 3 iterations (notification system, system config, modular architecture)
 - **Next Phase:** v0.7.0 (future feature development)
-- **Next Bug Fix:** v0.6.4 (if needed)  
+- **Next Bug Fix:** v0.6.4 (if needed)
+
+## Repository Management Protocol (Added 2025-06-10)
+**IMPORTANT:** Always perform full repository cleanup before starting next phase:
+
+### **Pre-Phase Cleanup Checklist:**
+1. ✅ **Repository Cleanup** - Remove temporary files, organize structure
+2. ✅ **Documentation Update** - Update README, version references, feature lists
+3. ✅ **Version Synchronization** - Update all package.json files and version constants
+4. ✅ **Comprehensive Commit** - Detailed commit message with all changes
+5. ✅ **GitHub Push** - Push all changes to master branch
+6. ✅ **GitHub Release** - Create tagged release with detailed notes: `gh release create vX.Y.Z --title "..." --generate-notes`
+7. ✅ **Remote Deployment** - Pull and deploy to development server: `ssh root@10.0.1.125 "cd /opt/traefik-ui && git pull origin master"`
+8. ✅ **Functionality Verification** - Test core functionality and API endpoints
+
+### **GitHub Release Commands:**
+```bash
+# Create release with auto-generated notes
+gh release create v0.6.3 --title "v0.6.3 - Enterprise-Grade Network & Observability Management" --generate-notes
+
+# For major releases, add detailed custom notes
+gh release create v0.7.0 --title "v0.7.0 - Phase 7: [Feature Name]" --notes-file RELEASE_NOTES.md
+```  
 
 ### Core Purpose
 Eliminates manual editing of Traefik configuration files by providing a visual web interface for:

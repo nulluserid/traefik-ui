@@ -309,11 +309,13 @@ class TraefikUtils {
 
     /**
      * Form Data Helper - Extract form data as object
+     * Works with both name attributes and ID-based elements
      */
     static getFormData(formElement) {
-        const formData = new FormData(formElement);
         const data = {};
         
+        // First try standard FormData approach (for elements with name attributes)
+        const formData = new FormData(formElement);
         for (let [key, value] of formData.entries()) {
             // Handle checkboxes and multiple values
             if (data[key]) {
@@ -326,6 +328,29 @@ class TraefikUtils {
                 data[key] = value;
             }
         }
+        
+        // Also extract data by ID for elements without name attributes
+        const elements = formElement.querySelectorAll('input, select, textarea');
+        elements.forEach(element => {
+            if (element.id && !data[element.id]) {
+                if (element.type === 'checkbox' || element.type === 'radio') {
+                    data[element.id] = element.checked ? (element.value || 'on') : undefined;
+                } else if (element.type === 'file') {
+                    data[element.id] = element.files;
+                } else if (element.tagName === 'SELECT' && element.multiple) {
+                    data[element.id] = Array.from(element.selectedOptions).map(opt => opt.value);
+                } else {
+                    data[element.id] = element.value;
+                }
+            }
+        });
+        
+        // Clean up undefined values
+        Object.keys(data).forEach(key => {
+            if (data[key] === undefined || data[key] === '') {
+                delete data[key];
+            }
+        });
         
         return data;
     }

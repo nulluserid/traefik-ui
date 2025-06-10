@@ -63,6 +63,7 @@ class TraefikCoreConfig {
             this.displayRoutes(data.dynamic?.http?.routers || {});
             this.displayServices(data.dynamic?.http?.services || {});
             this.populateDNSProviderDropdown();
+            this.populateMiddlewareDropdowns();
             return data;
         } catch (error) {
             TraefikUtils.showNotification('Failed to load configuration', 'error');
@@ -145,7 +146,7 @@ class TraefikCoreConfig {
         
         try {
             const formData = TraefikUtils.getFormData(e.target);
-            const config = this.buildRouteConfig(formData);
+            const config = await this.buildRouteConfig(formData);
             
             // Validate configuration
             this.validateRouteConfig(config);
@@ -160,44 +161,61 @@ class TraefikCoreConfig {
         }
     }
 
-    buildRouteConfig(formData) {
+    async buildRouteConfig(formData) {
         const config = {
-            name: formData.routeName,
+            name: formData['route-name'] || formData.routeName,
             rule: `Host(\`${formData.hostname}\`)`,
-            service: formData.routeName,
-            serviceUrl: formData.backendUrl
+            service: formData['route-name'] || formData.routeName,
+            serviceUrl: formData['backend-url'] || formData.backendUrl
         };
 
         // Add TLS configuration
-        if (formData.enableTls) {
-            config.tls = this.buildTlsConfig(
-                formData.tlsMethod,
-                formData.dnsProvider,
-                formData.certChain,
-                formData.privateKey,
+        if (formData['enable-tls'] === 'on' || formData.enableTls) {
+            config.tls = await this.buildTlsConfig(
+                formData['tls-method'] || formData.tlsMethod,
+                formData['dns-provider'] || formData.dnsProvider,
+                formData['cert-chain'] || formData.certChain,
+                formData['private-key'] || formData.privateKey,
                 formData.hostname
             );
         }
 
         // Add middleware
-        if (formData.enableCrowdsec && formData.middlewareName) {
-            config.middleware = [formData.middlewareName];
+        if ((formData['enable-crowdsec'] === 'on' || formData.enableCrowdsec) && (formData['middleware-select'] || formData.middlewareName)) {
+            config.middleware = [formData['middleware-select'] || formData.middlewareName];
         }
 
         // Add service options
         const serviceOptions = {};
-        if (formData.ignoreTlsErrors) {
+        if (formData['ignore-tls-errors'] === 'on' || formData.ignoreTlsErrors) {
             serviceOptions.serversTransport = 'insecure@internal';
         }
-        if (formData.healthCheck) {
-            serviceOptions.healthCheck = { path: formData.healthCheckPath || '/health' };
+        if (formData['health-check'] === 'on' || formData.healthCheck) {
+            serviceOptions.healthCheck = { path: formData['health-check-path'] || formData.healthCheckPath || '/health' };
         }
         config.serviceOptions = serviceOptions;
 
         return config;
     }
 
-    buildTlsConfig(tlsMethod, dnsProvider, certChain, privateKey, hostname) {
+    async uploadCustomCertificate(hostname, certChain, privateKey) {
+        try {
+            await TraefikUtils.apiRequest('/api/certificate', {
+                method: 'POST',
+                body: JSON.stringify({
+                    hostname: hostname,
+                    certificate: certChain,
+                    privateKey: privateKey
+                })
+            });
+            TraefikUtils.showNotification(`Certificate uploaded for ${hostname}`, 'success');
+        } catch (error) {
+            console.error('Certificate upload failed:', error);
+            throw new Error(`Failed to upload certificate: ${error.message}`);
+        }
+    }
+
+    async buildTlsConfig(tlsMethod, dnsProvider, certChain, privateKey, hostname) {
         switch (tlsMethod) {
             case 'letsencrypt':
                 return {
@@ -224,6 +242,8 @@ class TraefikCoreConfig {
                 if (!certChain || !privateKey) {
                     throw new Error('Certificate chain and private key required for custom certificates');
                 }
+                // Upload certificate to server
+                await this.uploadCustomCertificate(hostname, certChain, privateKey);
                 return { options: 'custom-tls@file' };
             
             default:
@@ -388,6 +408,52 @@ class TraefikCoreConfig {
             option.textContent = `${provider.name} (${provider.nameserver})`;
             select.appendChild(option);
         });
+        
+        // Also populate label generator DNS provider dropdown
+        const labelSelect = TraefikUtils.getElement('label-dns-provider', false);
+        if (labelSelect) {
+            labelSelect.innerHTML = '<option value="">Select DNS Provider</option>';
+            providers.forEach(provider => {
+                const option = document.createElement('option');
+                option.value = provider.name;
+                option.textContent = `${provider.name} (${provider.nameserver})`;
+                labelSelect.appendChild(option);
+            });
+        }
+    }
+
+    async populateMiddlewareDropdowns() {
+        try {
+            const data = await TraefikUtils.apiRequest('/api/middleware');
+            const middlewares = data.middlewares || {};
+            
+            // Populate Add Route middleware dropdown
+            const middlewareSelect = TraefikUtils.getElement('middleware-select', false);
+            if (middlewareSelect) {
+                middlewareSelect.innerHTML = '';
+                Object.keys(middlewares).forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    middlewareSelect.appendChild(option);
+                });
+            }
+            
+            // Populate Label Generator middleware dropdown
+            const labelMiddlewareSelect = TraefikUtils.getElement('label-middleware-select', false);
+            if (labelMiddlewareSelect) {
+                labelMiddlewareSelect.innerHTML = '';
+                Object.keys(middlewares).forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    labelMiddlewareSelect.appendChild(option);
+                });
+            }
+            
+        } catch (error) {
+            console.error('Failed to load middleware for dropdowns:', error);
+        }
     }
 
     async handleDNSProviderSubmit(e) {
@@ -451,6 +517,7 @@ class TraefikCoreConfig {
         try {
             const data = await TraefikUtils.apiRequest('/api/middleware');
             this.displayMiddleware(data.middlewares || {});
+            this.populateMiddlewareDropdowns();
             return data.middlewares;
         } catch (error) {
             TraefikUtils.showNotification('Failed to load middleware', 'error');
@@ -513,6 +580,7 @@ class TraefikCoreConfig {
             TraefikUtils.showNotification('CrowdSec middleware created successfully!', 'success');
             e.target.reset();
             this.loadMiddleware();
+            this.populateMiddlewareDropdowns();
             
         } catch (error) {
             TraefikUtils.showNotification('Failed to create CrowdSec middleware', 'error');
@@ -531,6 +599,7 @@ class TraefikCoreConfig {
             await TraefikUtils.apiRequest(`/api/middleware/${name}`, { method: 'DELETE' });
             TraefikUtils.showNotification('Middleware deleted successfully!', 'success');
             this.loadMiddleware();
+            this.populateMiddlewareDropdowns();
         } catch (error) {
             TraefikUtils.showNotification('Failed to delete middleware', 'error');
         }
@@ -568,11 +637,34 @@ class TraefikCoreConfig {
             const form = TraefikUtils.getElement('label-generator-form');
             const formData = TraefikUtils.getFormData(form);
             
-            const labels = this.buildDockerLabels(formData);
-            const outputElement = TraefikUtils.getElement('generated-labels');
+            // Map form field names to expected values
+            const mappedData = {
+                serviceName: formData['label-service-name'],
+                hostname: formData['label-hostname'],
+                port: formData['label-port'],
+                path: formData['label-path'],
+                enableTls: formData['label-enable-tls'] === 'on',
+                tlsMethod: formData['label-tls-method'],
+                dnsProvider: formData['label-dns-provider'],
+                enableCrowdsec: formData['label-enable-crowdsec'] === 'on',
+                middlewareName: formData['label-middleware-select'],
+                ignoreTlsErrors: formData['label-ignore-tls-errors'] === 'on'
+            };
+            
+            // Validation
+            if (!mappedData.serviceName || !mappedData.hostname) {
+                throw new Error('Service name and hostname are required');
+            }
+            
+            const labels = this.buildDockerLabels(mappedData);
+            const outputElement = TraefikUtils.getElement('generated-labels-output');
+            const sectionElement = TraefikUtils.getElement('generated-labels-section');
             
             outputElement.textContent = labels;
-            outputElement.style.display = 'block';
+            sectionElement.classList.remove('hidden');
+            
+            // Generate example docker-compose.yml
+            this.generateComposeExample(mappedData);
             
             TraefikUtils.showNotification('Labels generated successfully!', 'success');
         } catch (error) {
@@ -585,9 +677,16 @@ class TraefikCoreConfig {
         
         // Basic labels
         labels.push(`traefik.enable=true`);
-        labels.push(`traefik.http.routers.${formData.serviceName}.rule=Host(\`${formData.hostname}\`)`);
+        
+        // Router rule
+        let rule = `Host(\`${formData.hostname}\`)`;
+        if (formData.path) {
+            rule += ` && PathPrefix(\`${formData.path}\`)`;
+        }
+        labels.push(`traefik.http.routers.${formData.serviceName}.rule=${rule}`);
         labels.push(`traefik.http.routers.${formData.serviceName}.entrypoints=web`);
         
+        // Service port
         if (formData.port) {
             labels.push(`traefik.http.services.${formData.serviceName}.loadbalancer.server.port=${formData.port}`);
         }
@@ -596,27 +695,70 @@ class TraefikCoreConfig {
         if (formData.enableTls) {
             labels.push(`traefik.http.routers.${formData.serviceName}.tls=true`);
             
-            if (formData.tlsMethod === 'letsencrypt') {
+            if (formData.tlsMethod === 'letsencrypt-http') {
                 labels.push(`traefik.http.routers.${formData.serviceName}.tls.certresolver=letsencrypt`);
             } else if (formData.tlsMethod === 'letsencrypt-dns' && formData.dnsProvider) {
                 labels.push(`traefik.http.routers.${formData.serviceName}.tls.certresolver=letsencrypt-dns-${formData.dnsProvider}`);
+            } else if (formData.tlsMethod === 'letsencrypt-staging-http') {
+                labels.push(`traefik.http.routers.${formData.serviceName}.tls.certresolver=letsencrypt-staging`);
+            } else if (formData.tlsMethod === 'letsencrypt-staging-dns' && formData.dnsProvider) {
+                labels.push(`traefik.http.routers.${formData.serviceName}.tls.certresolver=letsencrypt-staging-dns-${formData.dnsProvider}`);
+            } else if (formData.tlsMethod === 'custom') {
+                labels.push(`traefik.http.routers.${formData.serviceName}.tls.options=custom-tls@file`);
             }
+            
+            // Switch to websecure entrypoint for TLS
+            labels.push(`traefik.http.routers.${formData.serviceName}.entrypoints=websecure`);
         }
         
         // Middleware
+        let middlewares = [];
         if (formData.enableCrowdsec && formData.middlewareName) {
-            labels.push(`traefik.http.routers.${formData.serviceName}.middlewares=${formData.middlewareName}`);
+            middlewares.push(formData.middlewareName);
+        }
+        if (formData.middlewareName && Array.isArray(formData.middlewareName)) {
+            middlewares = middlewares.concat(formData.middlewareName);
+        }
+        if (middlewares.length > 0) {
+            labels.push(`traefik.http.routers.${formData.serviceName}.middlewares=${middlewares.join(',')}`);
+        }
+        
+        // Service transport for TLS errors
+        if (formData.ignoreTlsErrors) {
+            labels.push(`traefik.http.services.${formData.serviceName}.loadbalancer.serverstransport=insecure@internal`);
         }
         
         return labels.map(label => `      - "${label}"`).join('\n');
     }
 
+    generateComposeExample(formData) {
+        const exampleElement = TraefikUtils.getElement('compose-example');
+        if (!exampleElement) return;
+        
+        const labels = this.buildDockerLabels(formData);
+        const example = `version: '3.8'
+services:
+  ${formData.serviceName}:
+    image: your-app-image:latest
+    labels:
+${labels}
+    networks:
+      - traefik
+    # Additional service configuration...
+
+networks:
+  traefik:
+    external: true`;
+        
+        exampleElement.textContent = example;
+    }
+
     async copyLabelsToClipboard() {
-        const outputElement = TraefikUtils.getElement('generated-labels');
-        if (outputElement.textContent) {
+        const outputElement = TraefikUtils.getElement('generated-labels-output');
+        if (outputElement && outputElement.textContent) {
             await TraefikUtils.copyToClipboard(outputElement.textContent);
         } else {
-            TraefikUtils.showNotification('No labels to copy', 'warning');
+            TraefikUtils.showNotification('No labels to copy. Generate labels first.', 'warning');
         }
     }
 }

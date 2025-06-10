@@ -148,7 +148,7 @@ class TraefikObservability {
     }
 
     displayDomainOverview(domains) {
-        const container = TraefikUtils.getElement('domains-overview');
+        const container = TraefikUtils.getElement('domain-cards');
         if (!container) return;
         
         if (domains.length === 0) {
@@ -738,6 +738,52 @@ class TraefikObservability {
             TraefikUtils.showNotification('Observability configuration exported successfully!', 'success');
         } catch (error) {
             TraefikUtils.showNotification('Failed to export observability configuration', 'error');
+        }
+    }
+
+    /**
+     * Additional Observability Actions
+     */
+    async exportObservabilityConfig() {
+        try {
+            const config = await TraefikUtils.apiRequest('/api/observability/config');
+            
+            const dataStr = JSON.stringify(config, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            
+            const url = URL.createObjectURL(dataBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `observability-config-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            
+            URL.revokeObjectURL(url);
+            TraefikUtils.showNotification('Observability configuration exported!', 'success');
+            
+        } catch (error) {
+            console.error('Export failed:', error);
+            TraefikUtils.showNotification('Failed to export configuration', 'error');
+        }
+    }
+
+    async restartTraefikWithObservability() {
+        const confirmed = await TraefikUIComponents.showConfirmDialog(
+            'This will restart Traefik to apply observability settings. Continue?',
+            'Restart Traefik'
+        );
+        
+        if (!confirmed) return;
+
+        try {
+            const result = await TraefikUtils.apiRequest('/api/restart', { method: 'POST' });
+            
+            if (result.success) {
+                TraefikUtils.showNotification('Traefik restarted with observability settings!', 'success');
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error) {
+            TraefikUtils.showNotification('Failed to restart Traefik', 'error');
         }
     }
 }
