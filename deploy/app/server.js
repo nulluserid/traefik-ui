@@ -1052,64 +1052,6 @@ app.get('/api/domains/conflicts', async (req, res) => {
   }
 });
 
-// Get detailed configuration for specific domain
-app.get('/api/domains/:domain', async (req, res) => {
-  try {
-    const { domain } = req.params;
-    let config = {};
-    if (fs.existsSync(DYNAMIC_CONFIG_PATH)) {
-      config = yaml.load(fs.readFileSync(DYNAMIC_CONFIG_PATH, 'utf8'));
-    }
-
-    const routers = config.http?.routers || {};
-    const services = config.http?.services || {};
-    const middlewares = config.http?.middlewares || {};
-
-    // Find router for this domain
-    const routerEntry = Object.entries(routers).find(([name, routerConfig]) => 
-      extractDomainFromRule(routerConfig.rule) === domain
-    );
-
-    if (!routerEntry) {
-      return res.status(404).json({ error: 'Domain not found' });
-    }
-
-    const [routerName, routerConfig] = routerEntry;
-    const serviceName = routerConfig.service;
-    const serviceConfig = services[serviceName];
-
-    // Get detailed backend analysis
-    const backend = analyzeBackend(serviceConfig);
-    const backendDetails = await getBackendDetails(backend);
-    
-    // Get detailed TLS analysis
-    const tlsDetails = await getTLSDetails(domain, routerConfig);
-    
-    // Get middleware details
-    const middlewareDetails = await getMiddlewareDetails(routerConfig.middlewares || [], middlewares);
-    
-    // Get network path analysis
-    const networkPath = await analyzeNetworkPath(backend);
-
-    res.json({
-      domain,
-      routerName,
-      serviceName,
-      routerConfig,
-      serviceConfig,
-      backend,
-      backendDetails,
-      tlsDetails,
-      middlewareDetails,
-      networkPath,
-      health: await determineHealthStatus(domain, backend)
-    });
-  } catch (error) {
-    console.error('Domain details error:', error);
-    res.status(500).json({ error: 'Failed to get domain details' });
-  }
-});
-
 // Get health status for specific domain
 app.get('/api/domains/:domain/health', async (req, res) => {
   try {
@@ -1342,6 +1284,64 @@ app.get('/api/domains/:domain/traces', async (req, res) => {
   } catch (error) {
     console.error('Traces error:', error);
     res.status(500).json({ error: 'Failed to get domain traces' });
+  }
+});
+
+// Get detailed configuration for specific domain (must come after all specific routes)
+app.get('/api/domains/:domain', async (req, res) => {
+  try {
+    const { domain } = req.params;
+    let config = {};
+    if (fs.existsSync(DYNAMIC_CONFIG_PATH)) {
+      config = yaml.load(fs.readFileSync(DYNAMIC_CONFIG_PATH, 'utf8'));
+    }
+
+    const routers = config.http?.routers || {};
+    const services = config.http?.services || {};
+    const middlewares = config.http?.middlewares || {};
+
+    // Find router for this domain
+    const routerEntry = Object.entries(routers).find(([name, routerConfig]) => 
+      extractDomainFromRule(routerConfig.rule) === domain
+    );
+
+    if (!routerEntry) {
+      return res.status(404).json({ error: 'Domain not found' });
+    }
+
+    const [routerName, routerConfig] = routerEntry;
+    const serviceName = routerConfig.service;
+    const serviceConfig = services[serviceName];
+
+    // Get detailed backend analysis
+    const backend = analyzeBackend(serviceConfig);
+    const backendDetails = await getBackendDetails(backend);
+    
+    // Get detailed TLS analysis
+    const tlsDetails = await getTLSDetails(domain, routerConfig);
+    
+    // Get middleware details
+    const middlewareDetails = await getMiddlewareDetails(routerConfig.middlewares || [], middlewares);
+    
+    // Get network path analysis
+    const networkPath = await analyzeNetworkPath(backend);
+
+    res.json({
+      domain,
+      routerName,
+      serviceName,
+      routerConfig,
+      serviceConfig,
+      backend,
+      backendDetails,
+      tlsDetails,
+      middlewareDetails,
+      networkPath,
+      health: await determineHealthStatus(domain, backend)
+    });
+  } catch (error) {
+    console.error('Domain details error:', error);
+    res.status(500).json({ error: 'Failed to get domain details' });
   }
 });
 
