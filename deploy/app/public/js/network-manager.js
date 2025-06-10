@@ -1,7 +1,7 @@
 /**
  * Traefik UI - Network Manager Module
  * Handles Docker service discovery, network management, and container operations
- * Version: 0.0.6
+ * Version: 0.6.4
  */
 
 class TraefikNetworkManager {
