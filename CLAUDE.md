@@ -201,7 +201,47 @@ This project has both a standalone version (root directory) and a complete deplo
 - Certificate format validation for custom uploads
 - Form validation prevents invalid route creation
 
-## Current Features Status (v0.0.5)
+## Version Management System
+
+**🔄 Configuration Schema Versioning:**
+Comprehensive version tracking and automatic migration system for backward compatibility.
+
+**Current Schema Version:** `0.0.6`
+**Supported Versions:** `0.0.5`, `0.0.6`
+
+**Version Stamps in Configuration:**
+```yaml
+traefik_ui:
+  version: "0.0.6"                    # UI version
+  config_schema_version: "0.0.6"     # Schema version (for migrations)
+  backup:
+    ui_version: "0.0.6"
+    config_schema_version: "0.0.6"
+    backup_from_version: "0.0.5"     # Original version (if migrated)
+    migration_applied: true           # If migration was applied
+    migrated_from: "0.0.5"           # Source version
+    migrated_at: "2025-06-10T..."     # Migration timestamp
+```
+
+**🛠️ Automatic Migration System:**
+- **Load-time migration:** Configurations are automatically migrated when loaded
+- **Import/restore migration:** Old backups/imports are migrated before application
+- **Backup preservation:** Original version information is preserved
+- **Sequential migrations:** Support for multi-step migrations (v0.0.5 → v0.0.6 → v0.0.7)
+
+**📝 Migration Guidelines for Future Versions:**
+1. **Increment CURRENT_CONFIG_VERSION** when schema changes
+2. **Add new version to SUPPORTED_CONFIG_VERSIONS** array
+3. **Create migration function** (e.g., `migrateFrom_0_0_6_to_0_0_7`)
+4. **Update default configuration** with new fields
+5. **Test migration with old configuration files**
+
+**🔍 Migration Functions:**
+- `migrateConfigToCurrentVersion()` - Main migration coordinator
+- `migrateFrom_0_0_5_to_0_0_6()` - v0.0.5 → v0.0.6 migration
+- `ensureConfigCompleteness()` - Fills missing fields with defaults
+
+## Current Features Status (v0.0.6)
 
 ### ✅ Completed Features
 1. **Visual Configuration Management** - Web interface for routes/services with intelligent validation

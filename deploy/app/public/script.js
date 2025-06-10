@@ -2822,6 +2822,11 @@ scrape_timeout: 10s`;
                 }
             }
             
+            // Show migration information
+            if (result.migration_info?.migration_applied) {
+                validationHtml += `<div class="migration-info">🔄 Migration: v${result.migration_info.original_version} → v${result.migration_info.current_version}</div>`;
+            }
+            
             if (result.warnings?.length) {
                 validationHtml += '<div class="warning">⚠️ Warnings:</div>';
                 validationHtml += '<ul class="warning-list">' + 
@@ -2852,7 +2857,15 @@ scrape_timeout: 10s`;
             const result = await response.json();
             
             if (result.success) {
-                this.showNotification(`Configuration imported successfully! ${result.backup ? `Backup: ${result.backup}` : ''}`, 'success');
+                let message = 'Configuration imported successfully!';
+                if (result.backup) {
+                    message += ` Backup: ${result.backup}`;
+                }
+                if (result.migration_info?.migration_applied) {
+                    message += ` (Migrated from v${result.migration_info.original_version} to v${result.migration_info.current_version})`;
+                }
+                
+                this.showNotification(message, 'success');
                 this.refreshConfigViewer();
                 
                 // Reset import form
@@ -2977,7 +2990,15 @@ scrape_timeout: 10s`;
             const result = await response.json();
             
             if (result.success) {
-                this.showNotification(`Configuration restored from ${result.restored_from}! ${result.current_backup ? `Current config backed up as: ${result.current_backup}` : ''}`, 'success');
+                let message = `Configuration restored from ${result.restored_from}!`;
+                if (result.current_backup) {
+                    message += ` Current config backed up as: ${result.current_backup}`;
+                }
+                if (result.migration_info?.migration_applied) {
+                    message += ` (Migrated from v${result.migration_info.original_version} to v${result.migration_info.current_version})`;
+                }
+                
+                this.showNotification(message, 'success');
                 this.closeRestoreModal();
                 this.refreshConfigViewer();
                 this.refreshBackupList();

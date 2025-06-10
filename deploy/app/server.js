@@ -1417,10 +1417,15 @@ if (!fs.existsSync(UI_BACKUPS_DIR)) {
   fs.mkdirSync(UI_BACKUPS_DIR, { recursive: true });
 }
 
+// Current configuration version - increment when schema changes
+const CURRENT_CONFIG_VERSION = '0.0.6';
+const SUPPORTED_CONFIG_VERSIONS = ['0.0.5', '0.0.6'];
+
 // Default UI configuration structure
 const DEFAULT_UI_CONFIG = {
   traefik_ui: {
-    version: '0.0.6',
+    version: CURRENT_CONFIG_VERSION,
+    config_schema_version: CURRENT_CONFIG_VERSION,
     dns_providers: [],
     observability: {
       presets: {
@@ -1479,19 +1484,173 @@ const DEFAULT_UI_CONFIG = {
     backup: {
       created: new Date().toISOString(),
       traefik_version: 'v3.0',
-      ui_version: '0.0.6'
+      ui_version: CURRENT_CONFIG_VERSION,
+      config_schema_version: CURRENT_CONFIG_VERSION
     }
   }
 };
+
+// Configuration Migration System
+function migrateConfigToCurrentVersion(config) {
+  if (!config.traefik_ui) {
+    console.warn('Invalid configuration structure, using default');
+    return DEFAULT_UI_CONFIG;
+  }
+
+  const configVersion = config.traefik_ui.config_schema_version || config.traefik_ui.version || '0.0.5';
+  
+  if (configVersion === CURRENT_CONFIG_VERSION) {
+    // Already current version, just ensure all required fields exist
+    return ensureConfigCompleteness(config);
+  }
+
+  if (!SUPPORTED_CONFIG_VERSIONS.includes(configVersion)) {
+    console.warn(`Unsupported config version ${configVersion}, using default`);
+    return DEFAULT_UI_CONFIG;
+  }
+
+  console.log(`Migrating configuration from v${configVersion} to v${CURRENT_CONFIG_VERSION}`);
+  
+  let migratedConfig = JSON.parse(JSON.stringify(config)); // Deep clone
+  
+  // Apply migrations in sequence
+  if (configVersion === '0.0.5') {
+    migratedConfig = migrateFrom_0_0_5_to_0_0_6(migratedConfig);
+  }
+  
+  // Future migrations would be added here:
+  // if (configVersion === '0.0.6') {
+  //   migratedConfig = migrateFrom_0_0_6_to_0_0_7(migratedConfig);
+  // }
+  
+  // Update version stamps
+  migratedConfig.traefik_ui.version = CURRENT_CONFIG_VERSION;
+  migratedConfig.traefik_ui.config_schema_version = CURRENT_CONFIG_VERSION;
+  migratedConfig.traefik_ui.backup.ui_version = CURRENT_CONFIG_VERSION;
+  migratedConfig.traefik_ui.backup.config_schema_version = CURRENT_CONFIG_VERSION;
+  migratedConfig.traefik_ui.backup.migrated_from = configVersion;
+  migratedConfig.traefik_ui.backup.migrated_at = new Date().toISOString();
+  
+  return ensureConfigCompleteness(migratedConfig);
+}
+
+function migrateFrom_0_0_5_to_0_0_6(config) {
+  console.log('Applying v0.0.5 → v0.0.6 migration');
+  
+  // Add new observability structure if missing
+  if (!config.traefik_ui.observability) {
+    config.traefik_ui.observability = {
+      presets: {
+        production: {
+          access_logs: { enabled: true, format: 'json', graylog: { enabled: false } },
+          metrics: { enabled: true, port: 8082, categories: { entrypoint: true, router: true, service: true } },
+          tracing: { enabled: true, backend: 'jaeger', samplingRate: 0.1 }
+        },
+        development: {
+          access_logs: { enabled: true, format: 'clf', graylog: { enabled: false } },
+          metrics: { enabled: true, port: 8082, categories: { entrypoint: true, router: false, service: false } },
+          tracing: { enabled: false }
+        },
+        minimal: {
+          access_logs: { enabled: false },
+          metrics: { enabled: false },
+          tracing: { enabled: false }
+        }
+      },
+      defaults: {
+        access_logs_format: 'json',
+        metrics_port: 8082,
+        tracing_backend: 'jaeger'
+      }
+    };
+  }
+  
+  // Add new UI settings if missing
+  if (!config.traefik_ui.ui) {
+    config.traefik_ui.ui = {
+      theme: 'auto',
+      default_tls_method: 'letsencrypt-dns',
+      default_middleware: ['crowdsec-bouncer'],
+      network_scan_interval: 300,
+      auto_backup: true,
+      backup_retention_days: 30
+    };
+  } else {
+    // Ensure new fields exist
+    if (!config.traefik_ui.ui.auto_backup) config.traefik_ui.ui.auto_backup = true;
+    if (!config.traefik_ui.ui.backup_retention_days) config.traefik_ui.ui.backup_retention_days = 30;
+  }
+  
+  // Add templates if missing
+  if (!config.traefik_ui.templates) {
+    config.traefik_ui.templates = {
+      route_templates: {
+        'simple-web-app': {
+          name: 'Simple Web App',
+          description: 'Basic web application with Let\'s Encrypt SSL',
+          tls_method: 'letsencrypt-http',
+          middleware: []
+        },
+        'api-service': {
+          name: 'API Service',
+          description: 'REST API with CORS and rate limiting',
+          tls_method: 'letsencrypt-dns',
+          middleware: ['cors', 'rate-limit']
+        },
+        'protected-service': {
+          name: 'Protected Service',
+          description: 'Service with CrowdSec protection',
+          tls_method: 'letsencrypt-dns',
+          middleware: ['crowdsec-bouncer']
+        }
+      }
+    };
+  }
+  
+  return config;
+}
+
+function ensureConfigCompleteness(config) {
+  // Ensure all required fields exist by merging with default config
+  const merged = JSON.parse(JSON.stringify(DEFAULT_UI_CONFIG));
+  
+  // Deep merge user config over defaults
+  function deepMerge(target, source) {
+    for (const key in source) {
+      if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+        target[key] = target[key] || {};
+        deepMerge(target[key], source[key]);
+      } else {
+        target[key] = source[key];
+      }
+    }
+    return target;
+  }
+  
+  return deepMerge(merged, config);
+}
 
 // Helper functions for UI configuration management
 function loadUIConfig() {
   try {
     if (fs.existsSync(UI_CONFIG_PATH)) {
       const content = fs.readFileSync(UI_CONFIG_PATH, 'utf8');
-      return yaml.load(content);
+      const rawConfig = yaml.load(content);
+      
+      // Apply migrations and ensure completeness
+      const migratedConfig = migrateConfigToCurrentVersion(rawConfig);
+      
+      // Save migrated config if it was updated
+      const originalVersion = rawConfig.traefik_ui?.config_schema_version || rawConfig.traefik_ui?.version || '0.0.5';
+      if (originalVersion !== CURRENT_CONFIG_VERSION) {
+        console.log(`Configuration migrated from v${originalVersion} to v${CURRENT_CONFIG_VERSION}, saving...`);
+        saveUIConfig(migratedConfig);
+      }
+      
+      return migratedConfig;
     } else {
       // Create default config if it doesn't exist
+      console.log('Creating default UI configuration');
       saveUIConfig(DEFAULT_UI_CONFIG);
       return DEFAULT_UI_CONFIG;
     }
@@ -1503,9 +1662,12 @@ function loadUIConfig() {
 
 function saveUIConfig(config) {
   try {
-    // Update backup metadata
+    // Ensure current version stamps
     config.traefik_ui.backup.created = new Date().toISOString();
-    config.traefik_ui.version = '0.0.6';
+    config.traefik_ui.version = CURRENT_CONFIG_VERSION;
+    config.traefik_ui.config_schema_version = CURRENT_CONFIG_VERSION;
+    config.traefik_ui.backup.ui_version = CURRENT_CONFIG_VERSION;
+    config.traefik_ui.backup.config_schema_version = CURRENT_CONFIG_VERSION;
     
     fs.writeFileSync(UI_CONFIG_PATH, yaml.dump(config, { lineWidth: -1 }));
     return true;
@@ -1521,7 +1683,7 @@ function createBackup(config, backupName) {
     const filename = backupName || `ui-config-backup-${timestamp}.yml`;
     const backupPath = path.join(UI_BACKUPS_DIR, filename);
     
-    // Add backup metadata
+    // Add comprehensive backup metadata
     const backupConfig = {
       ...config,
       traefik_ui: {
@@ -1529,7 +1691,11 @@ function createBackup(config, backupName) {
         backup: {
           ...config.traefik_ui.backup,
           backup_created: new Date().toISOString(),
-          backup_type: backupName ? 'manual' : 'automatic'
+          backup_type: backupName ? 'manual' : 'automatic',
+          backup_from_version: config.traefik_ui.config_schema_version || config.traefik_ui.version || CURRENT_CONFIG_VERSION,
+          backup_tool_version: CURRENT_CONFIG_VERSION,
+          backup_id: `backup-${timestamp}`,
+          original_created: config.traefik_ui.backup.created
         }
       }
     };
@@ -1715,15 +1881,23 @@ app.post('/api/config/ui/restore', (req, res) => {
       return res.status(404).json({ error: 'Backup file not found' });
     }
     
-    // Load and validate backup
-    const backupConfig = yaml.load(fs.readFileSync(backupPath, 'utf8'));
-    const validation = validateUIConfig(backupConfig);
+    // Load and migrate backup if needed
+    const rawBackupConfig = yaml.load(fs.readFileSync(backupPath, 'utf8'));
+    const backupVersion = rawBackupConfig.traefik_ui?.config_schema_version || rawBackupConfig.traefik_ui?.version || '0.0.5';
+    
+    console.log(`Restoring backup from v${backupVersion}`);
+    
+    // Apply migrations to backup before validation
+    const migratedBackupConfig = migrateConfigToCurrentVersion(rawBackupConfig);
+    const validation = validateUIConfig(migratedBackupConfig);
     
     if (!validation.valid) {
       return res.status(400).json({
-        error: 'Backup validation failed',
+        error: 'Backup validation failed after migration',
         errors: validation.errors,
-        warnings: validation.warnings
+        warnings: validation.warnings,
+        backupVersion,
+        currentVersion: CURRENT_CONFIG_VERSION
       });
     }
     
@@ -1731,14 +1905,27 @@ app.post('/api/config/ui/restore', (req, res) => {
     const currentConfig = loadUIConfig();
     const currentBackup = createBackup(currentConfig, `pre-restore-${Date.now()}`);
     
+    // Add restore metadata
+    migratedBackupConfig.traefik_ui.backup.restored_at = new Date().toISOString();
+    migratedBackupConfig.traefik_ui.backup.restored_from = filename;
+    if (backupVersion !== CURRENT_CONFIG_VERSION) {
+      migratedBackupConfig.traefik_ui.backup.migration_applied = true;
+      migratedBackupConfig.traefik_ui.backup.original_version = backupVersion;
+    }
+    
     // Restore configuration
-    if (saveUIConfig(backupConfig)) {
+    if (saveUIConfig(migratedBackupConfig)) {
       res.json({
         success: true,
         message: 'Configuration restored successfully',
         restored_from: filename,
         current_backup: currentBackup.success ? currentBackup.filename : null,
-        validation: validation
+        validation: validation,
+        migration_info: {
+          original_version: backupVersion,
+          current_version: CURRENT_CONFIG_VERSION,
+          migration_applied: backupVersion !== CURRENT_CONFIG_VERSION
+        }
       });
     } else {
       res.status(500).json({ error: 'Failed to restore configuration' });
@@ -1770,30 +1957,43 @@ app.post('/api/config/ui/import', (req, res) => {
   try {
     const { config, validate_only = false } = req.body;
     
-    let importedConfig;
+    let rawImportedConfig;
     try {
-      importedConfig = typeof config === 'string' ? yaml.load(config) : config;
+      rawImportedConfig = typeof config === 'string' ? yaml.load(config) : config;
     } catch (error) {
       return res.status(400).json({ error: 'Invalid YAML format' });
     }
     
-    // Validate configuration
-    const validation = validateUIConfig(importedConfig);
+    // Detect and apply migrations
+    const importVersion = rawImportedConfig.traefik_ui?.config_schema_version || rawImportedConfig.traefik_ui?.version || '0.0.5';
+    console.log(`Importing configuration from v${importVersion}`);
+    
+    const migratedConfig = migrateConfigToCurrentVersion(rawImportedConfig);
+    const validation = validateUIConfig(migratedConfig);
     
     if (validate_only) {
       return res.json({
         valid: validation.valid,
         errors: validation.errors,
         warnings: validation.warnings,
-        preview: importedConfig
+        preview: migratedConfig,
+        migration_info: {
+          original_version: importVersion,
+          current_version: CURRENT_CONFIG_VERSION,
+          migration_applied: importVersion !== CURRENT_CONFIG_VERSION
+        }
       });
     }
     
     if (!validation.valid) {
       return res.status(400).json({
-        error: 'Configuration validation failed',
+        error: 'Configuration validation failed after migration',
         errors: validation.errors,
-        warnings: validation.warnings
+        warnings: validation.warnings,
+        migration_info: {
+          original_version: importVersion,
+          current_version: CURRENT_CONFIG_VERSION
+        }
       });
     }
     
@@ -1801,13 +2001,25 @@ app.post('/api/config/ui/import', (req, res) => {
     const currentConfig = loadUIConfig();
     const backup = createBackup(currentConfig, `pre-import-${Date.now()}`);
     
+    // Add import metadata
+    migratedConfig.traefik_ui.backup.imported_at = new Date().toISOString();
+    if (importVersion !== CURRENT_CONFIG_VERSION) {
+      migratedConfig.traefik_ui.backup.migration_applied = true;
+      migratedConfig.traefik_ui.backup.original_import_version = importVersion;
+    }
+    
     // Import configuration
-    if (saveUIConfig(importedConfig)) {
+    if (saveUIConfig(migratedConfig)) {
       res.json({
         success: true,
         message: 'Configuration imported successfully',
         backup: backup.success ? backup.filename : null,
-        validation: validation
+        validation: validation,
+        migration_info: {
+          original_version: importVersion,
+          current_version: CURRENT_CONFIG_VERSION,
+          migration_applied: importVersion !== CURRENT_CONFIG_VERSION
+        }
       });
     } else {
       res.status(500).json({ error: 'Failed to import configuration' });
