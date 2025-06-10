@@ -1,7 +1,7 @@
 /**
  * Traefik UI - System Configuration Module
  * Handles system configuration management, backup, restore, import/export
- * Version: 0.6.5
+ * Version: 0.6.6
  */
 
 class TraefikSystemConfig {

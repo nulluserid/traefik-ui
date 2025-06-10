@@ -1,7 +1,7 @@
 /**
  * Traefik UI - Shared Utilities Module
  * Common functions and helpers used across all modules
- * Version: 0.6.5
+ * Version: 0.6.6
  */
 
 class TraefikUtils {
@@ -20,13 +20,40 @@ class TraefikUtils {
             });
             
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                const responseText = await response.text();
+                const error = new Error(`HTTP ${response.status}: ${response.statusText}`);
+                
+                // Log API error with detailed context
+                if (window.errorLogger) {
+                    window.errorLogger.logAPIError(
+                        endpoint, 
+                        options.method || 'GET', 
+                        response.status, 
+                        responseText,
+                        options.body
+                    );
+                }
+                
+                throw error;
             }
             
             return await response.json();
         } catch (error) {
             console.error(`API Request failed for ${endpoint}:`, error);
             this.showNotification(`API Error: ${error.message}`, 'error');
+            
+            // Log non-HTTP errors too
+            if (window.errorLogger && !error.message.includes('HTTP')) {
+                window.errorLogger.logError({
+                    type: 'api_network_error',
+                    message: `Network error for ${endpoint}: ${error.message}`,
+                    endpoint,
+                    method: options.method || 'GET',
+                    url: window.location.href,
+                    timestamp: new Date().toISOString()
+                });
+            }
+            
             throw error;
         }
     }

@@ -1,7 +1,7 @@
 /**
  * Traefik UI - Main Application Class
  * Orchestrates all modules and handles core UI functionality
- * Version: 0.6.5
+ * Version: 0.6.6
  */
 
 class TraefikUI {

@@ -1,7 +1,7 @@
 /**
  * Traefik UI - Observability Module
  * Handles domain overview, health monitoring, logging, metrics, and tracing
- * Version: 0.6.5
+ * Version: 0.6.6
  */
 
 class TraefikObservability {
@@ -139,6 +139,12 @@ class TraefikObservability {
             console.error('Failed to scan domains:', error);
             if (scanStatus) scanStatus.textContent = '❌ Failed to scan domains';
             TraefikUtils.showNotification(error.message, 'error');
+            
+            // Log component-specific error
+            window.logComponentError?.('DomainOverview', 'scanDomains', error, {
+                domainsCount: this.domains?.length || 0,
+                responseStructure: typeof response
+            });
         } finally {
             if (scanButton) scanButton.disabled = false;
         }
@@ -220,9 +226,9 @@ class TraefikObservability {
     }
 
     formatTLSInfo(tls) {
-        if (!tls.enabled) return 'None';
+        if (!tls || !tls.enabled) return 'None';
         
-        let info = tls.type;
+        let info = tls.type || 'Unknown';
         if (tls.provider) info += ` (${tls.provider})`;
         if (tls.expiresAt) {
             const days = Math.ceil((new Date(tls.expiresAt) - new Date()) / (1000 * 60 * 60 * 24));

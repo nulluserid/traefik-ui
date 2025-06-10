@@ -1,7 +1,7 @@
 /**
  * Traefik UI - Core Configuration Module
  * Handles routes, services, DNS providers, TLS, middleware, and templates
- * Version: 0.6.5
+ * Version: 0.6.6
  */
 
 class TraefikCoreConfig {

@@ -1,7 +1,7 @@
 /**
  * Traefik UI - UI Components Module
  * Reusable UI components and modal management
- * Version: 0.6.5
+ * Version: 0.6.6
  */
 
 class TraefikUIComponents {
