@@ -15,18 +15,13 @@ class TraefikUI {
     initTheme() {
         // Load saved theme or detect system preference
         const savedTheme = localStorage.getItem('theme');
-        console.log('Saved theme:', savedTheme);
         if (savedTheme) {
             document.documentElement.setAttribute('data-theme', savedTheme);
-            console.log('Set theme from localStorage:', savedTheme);
         } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
             document.documentElement.setAttribute('data-theme', 'dark');
-            console.log('Set theme from system preference: dark');
         } else {
             document.documentElement.setAttribute('data-theme', 'light');
-            console.log('Set theme to default: light');
         }
-        console.log('Current data-theme attribute:', document.documentElement.getAttribute('data-theme'));
 
         // Listen for system theme changes
         if (window.matchMedia) {
@@ -430,10 +425,8 @@ class TraefikUI {
         const currentTheme = document.documentElement.getAttribute('data-theme');
         const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
         
-        console.log('Toggling theme from', currentTheme, 'to', newTheme);
         document.documentElement.setAttribute('data-theme', newTheme);
         localStorage.setItem('theme', newTheme);
-        console.log('Theme toggled. New data-theme attribute:', document.documentElement.getAttribute('data-theme'));
     }
 
     async loadMiddleware() {
