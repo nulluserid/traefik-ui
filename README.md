@@ -1,6 +1,6 @@
 # Traefik UI
 
-**Version 0.0.6** - **Enterprise-Grade Network & Observability Management**
+**Version 0.6.3** - **Enterprise-Grade Network & Observability Management**
 
 A comprehensive web interface for managing Traefik proxy configurations with advanced network topology visualization, observability integration, and enterprise-grade configuration management.
 
@@ -13,26 +13,32 @@ A comprehensive web interface for managing Traefik proxy configurations with adv
 - **Enhanced TLS Options**: HTTP vs DNS challenge selection with Let's Encrypt integration
 - **Custom Certificate Support**: Upload PEM certificates with validation and automatic configuration
 
-### **🌐 Network Management (NEW in v0.0.6)**
+### **🌐 Network Management (NEW in v0.6.0)**
 - **Multi-Stack Network Discovery**: Scan and connect Traefik to external Docker networks
 - **Network Topology Visualization**: Interactive network maps showing container relationships
 - **Smart Route Validation**: Automatic network connectivity checks during route creation
 - **Cross-Stack Integration**: Enable services from external stacks to use Traefik
 
-### **📊 Domain Overview & Health Dashboard (NEW in v0.0.6)**
+### **📊 Domain Overview & Health Dashboard (NEW in v0.4.0)**
 - **Comprehensive Domain Analysis**: Real-time health monitoring with status indicators
 - **Backend Target Analysis**: Complete routing path visualization (domain → service → container)
 - **Configuration Conflict Detection**: Automatic identification of routing conflicts and orphaned services
 - **Multi-tab Domain Details**: Complete configuration analysis with observability data
 
-### **🔍 Observability & Monitoring (NEW in v0.0.6)**
+### **🔍 Observability & Monitoring (NEW in v0.5.0)**
 - **Preset Management System**: Production, Development, Minimal, and Custom configuration modes
 - **Access Logs Configuration**: JSON/CLF formatting with Graylog integration support
 - **Prometheus Metrics**: Configurable endpoints with category selection and sample configs
 - **OpenTelemetry Tracing**: Support for Jaeger, Zipkin, and OTLP backends with sampling control
 - **One-Click Configuration**: Automatic preset deployment with real-time form updates
 
-### **⚙️ Configuration Management (NEW in v0.0.6)**
+### **🌐 Remote Proxy Configuration (NEW in v0.6.0)**
+- **IP Forwarding Management**: Configure trusted proxy IPs for real client IP detection
+- **Proxy Scenario Presets**: CloudFlare, AWS ALB, nginx, HAProxy configurations with explanations
+- **Rate Limiting**: IP-based rate limiting with configurable thresholds
+- **Real-time Testing**: Built-in IP forwarding and proxy configuration testing
+
+### **⚙️ Configuration Management (NEW in v0.5.1)**
 - **Backup & Restore System**: Manual and automatic backups with metadata tracking
 - **Version Migration**: Automatic schema migration between versions
 - **Import/Export**: Configuration portability with validation
@@ -44,21 +50,26 @@ A comprehensive web interface for managing Traefik proxy configurations with adv
 - **Docker Label Generator**: Generate Traefik labels for docker-compose services
 - **System Theme Support**: Automatic dark/light theme detection with manual toggle
 
-## 🆕 What's New in v0.0.6
+## 🆕 What's New in v0.6.3
 
-### **Revolutionary Network & Observability Features**
-- **🌐 Domain Overview Dashboard**: Comprehensive health analysis with real-time topology mapping
-- **📊 Observability Presets**: One-click configuration for Production, Development, and Minimal setups
-- **🔍 Network Topology Visualization**: Interactive maps showing domain → service → container → network flow
-- **⚙️ Configuration Management**: Complete backup/restore system with automatic version migration
-- **🚀 Enhanced Performance**: Parallel configuration application and real-time status updates
+### **🌐 Remote Proxy Configuration (v0.6.0)**
+- **Advanced IP Forwarding**: Comprehensive trusted proxy IP management for CloudFlare, AWS ALB, nginx, HAProxy
+- **Proxy Scenario Presets**: One-click configuration with detailed explanations for common setups
+- **Rate Limiting & Security**: IP-based rate limiting with configurable thresholds and burst protection
+- **Real-time Testing**: Built-in IP forwarding validation and proxy configuration testing
 
-### **Enterprise-Grade Monitoring**
-- **Access Logs**: JSON/CLF formatting with external Graylog integration
-- **Prometheus Metrics**: Configurable endpoints with automatic Prometheus config generation
-- **OpenTelemetry Tracing**: Full support for Jaeger, Zipkin, and OTLP backends
-- **Health Monitoring**: Container inspection, network connectivity analysis, and certificate validation
-- **Conflict Detection**: Automatic identification of routing conflicts and configuration issues
+### **🔧 Architecture & Stability (v0.6.1-0.6.3)**
+- **Enhanced Notification System**: Vertical notification stacking with history management and better UX
+- **Modular Architecture**: Refactored into 6 focused JavaScript modules for better maintainability
+- **Comprehensive Testing**: Full testing framework with systematic coverage of all functionality
+- **System Config Fixes**: Resolved backup directory and configuration loading issues
+- **Semantic Versioning**: Implemented proper versioning strategy (features: +0.1.0, fixes: +0.0.1)
+
+### **📊 Complete Feature Set**
+- **Phase 1-6 Completed**: Label Generator, Service Discovery, Network Management, Domain Overview, Observability, Proxy Config
+- **Enterprise-Grade Monitoring**: Full observability with Prometheus, Jaeger, and Graylog integration
+- **Configuration Management**: Backup/restore, import/export, version migration, and validation
+- **Network Topology**: Advanced multi-stack network visualization and management
 
 ## Quick Start
 

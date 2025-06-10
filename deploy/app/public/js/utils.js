@@ -1,7 +1,7 @@
 /**
  * Traefik UI - Shared Utilities Module
  * Common functions and helpers used across all modules
- * Version: 0.0.6
+ * Version: 0.6.3
  */
 
 class TraefikUtils {
@@ -32,35 +32,268 @@ class TraefikUtils {
     }
 
     /**
-     * Standardized notification system
+     * Enhanced notification system with stacking and history
      */
+    static notificationHistory = [];
+    static notificationCounter = 0;
+
     static showNotification(message, type = 'info', duration = 5000) {
+        const timestamp = new Date();
+        const notificationId = ++this.notificationCounter;
+        
+        // Add to history
+        this.notificationHistory.unshift({
+            id: notificationId,
+            message,
+            type,
+            timestamp,
+            read: false
+        });
+        
+        // Keep only last 100 notifications in history
+        if (this.notificationHistory.length > 100) {
+            this.notificationHistory = this.notificationHistory.slice(0, 100);
+        }
+        
+        // Create notification element
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
-        notification.textContent = message;
+        notification.dataset.id = notificationId;
         
-        const container = document.getElementById('notifications') || this.createNotificationContainer();
-        container.appendChild(notification);
+        // Build notification content
+        notification.innerHTML = `
+            <div class="notification-content">
+                <div class="notification-icon">${this.getNotificationIcon(type)}</div>
+                <div class="notification-message">${this.sanitizeHTML(message)}</div>
+                <div class="notification-time">${timestamp.toLocaleTimeString()}</div>
+                <button class="notification-close" onclick="TraefikUtils.dismissNotification(${notificationId})">&times;</button>
+            </div>
+        `;
         
-        // Auto-remove notification
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, duration);
+        const container = this.getNotificationContainer();
+        
+        // Add notification to the top of the stack
+        if (container.firstChild) {
+            container.insertBefore(notification, container.firstChild);
+        } else {
+            container.appendChild(notification);
+        }
+        
+        // Animate in
+        setTimeout(() => notification.classList.add('notification-show'), 10);
+        
+        // Auto-remove notification if duration > 0
+        if (duration > 0) {
+            setTimeout(() => {
+                this.dismissNotification(notificationId);
+            }, duration);
+        }
+        
+        // Update notification count in header
+        this.updateNotificationCount();
         
         return notification;
     }
 
+    static dismissNotification(notificationId) {
+        const notification = document.querySelector(`[data-id="${notificationId}"]`);
+        if (notification) {
+            notification.classList.add('notification-hide');
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }
+        
+        // Mark as read in history
+        const historyItem = this.notificationHistory.find(n => n.id === notificationId);
+        if (historyItem) {
+            historyItem.read = true;
+        }
+        
+        this.updateNotificationCount();
+    }
+
+    static dismissAllNotifications() {
+        const notifications = document.querySelectorAll('.notification');
+        notifications.forEach(notification => {
+            const id = parseInt(notification.dataset.id);
+            this.dismissNotification(id);
+        });
+    }
+
+    static getNotificationIcon(type) {
+        const icons = {
+            success: '✅',
+            error: '❌',
+            warning: '⚠️',
+            info: 'ℹ️'
+        };
+        return icons[type] || icons.info;
+    }
+
+    static getNotificationContainer() {
+        let container = document.getElementById('notifications');
+        if (!container) {
+            container = this.createNotificationContainer();
+        }
+        return container;
+    }
+
     /**
-     * Create notification container if it doesn't exist
+     * Create notification container with improved styling
      */
     static createNotificationContainer() {
         const container = document.createElement('div');
         container.id = 'notifications';
         container.className = 'notifications-container';
         document.body.appendChild(container);
+        
+        // Add notification controls to header if not exists
+        this.addNotificationControls();
+        
         return container;
+    }
+
+    static addNotificationControls() {
+        const header = document.querySelector('header .header-controls');
+        if (header && !header.querySelector('.notification-controls')) {
+            const notificationControls = document.createElement('div');
+            notificationControls.className = 'notification-controls';
+            notificationControls.innerHTML = `
+                <button id="notification-toggle" class="btn btn-secondary" title="View notifications">
+                    🔔 <span id="notification-count" class="notification-badge">0</span>
+                </button>
+                <button id="clear-notifications" class="btn btn-secondary" title="Clear all notifications">🗑️</button>
+            `;
+            
+            header.appendChild(notificationControls);
+            
+            // Add event listeners
+            document.getElementById('notification-toggle').addEventListener('click', () => {
+                this.toggleNotificationHistory();
+            });
+            
+            document.getElementById('clear-notifications').addEventListener('click', () => {
+                this.dismissAllNotifications();
+            });
+        }
+    }
+
+    static updateNotificationCount() {
+        const unreadCount = this.notificationHistory.filter(n => !n.read).length;
+        const badge = document.getElementById('notification-count');
+        if (badge) {
+            badge.textContent = unreadCount;
+            badge.style.display = unreadCount > 0 ? 'inline' : 'none';
+        }
+    }
+
+    static toggleNotificationHistory() {
+        let historyModal = document.getElementById('notification-history-modal');
+        
+        if (historyModal) {
+            historyModal.remove();
+            return;
+        }
+        
+        historyModal = document.createElement('div');
+        historyModal.id = 'notification-history-modal';
+        historyModal.className = 'modal notification-history-modal';
+        historyModal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>📬 Notification History</h3>
+                    <button class="close-btn" onclick="document.getElementById('notification-history-modal').remove()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="notification-history-controls">
+                        <button class="btn btn-secondary btn-sm" onclick="TraefikUtils.clearNotificationHistory()">Clear History</button>
+                        <button class="btn btn-secondary btn-sm" onclick="TraefikUtils.markAllNotificationsRead()">Mark All Read</button>
+                    </div>
+                    <div id="notification-history-list" class="notification-history-list">
+                        ${this.buildNotificationHistoryHTML()}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(historyModal);
+        historyModal.style.display = 'block';
+        
+        // Mark all as read when viewing history
+        setTimeout(() => this.markAllNotificationsRead(), 1000);
+        
+        // Close on backdrop click
+        historyModal.addEventListener('click', (e) => {
+            if (e.target === historyModal) {
+                historyModal.remove();
+            }
+        });
+    }
+
+    static buildNotificationHistoryHTML() {
+        if (this.notificationHistory.length === 0) {
+            return '<p class="no-notifications">No notifications yet</p>';
+        }
+        
+        return this.notificationHistory.map(notification => {
+            const timeAgo = this.getTimeAgo(notification.timestamp);
+            const readClass = notification.read ? 'read' : 'unread';
+            
+            return `
+                <div class="notification-history-item ${readClass}">
+                    <div class="notification-history-icon">${this.getNotificationIcon(notification.type)}</div>
+                    <div class="notification-history-content">
+                        <div class="notification-history-message">${this.sanitizeHTML(notification.message)}</div>
+                        <div class="notification-history-meta">
+                            <span class="notification-history-type">${notification.type.toUpperCase()}</span>
+                            <span class="notification-history-time">${timeAgo}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    static getTimeAgo(timestamp) {
+        const now = new Date();
+        const diff = now - timestamp;
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+        
+        if (days > 0) return `${days}d ago`;
+        if (hours > 0) return `${hours}h ago`;
+        if (minutes > 0) return `${minutes}m ago`;
+        return 'Just now';
+    }
+
+    static clearNotificationHistory() {
+        this.notificationHistory = [];
+        this.updateNotificationCount();
+        
+        const historyList = document.getElementById('notification-history-list');
+        if (historyList) {
+            historyList.innerHTML = '<p class="no-notifications">No notifications yet</p>';
+        }
+        
+        this.showNotification('Notification history cleared', 'info');
+    }
+
+    static markAllNotificationsRead() {
+        this.notificationHistory.forEach(notification => {
+            notification.read = true;
+        });
+        this.updateNotificationCount();
+        
+        // Update visual state in history
+        const historyItems = document.querySelectorAll('.notification-history-item.unread');
+        historyItems.forEach(item => {
+            item.classList.remove('unread');
+            item.classList.add('read');
+        });
     }
 
     /**

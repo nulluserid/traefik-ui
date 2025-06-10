@@ -5,16 +5,22 @@ This file provides comprehensive guidance to Claude Code (claude.ai/code) when w
 **IMPORTANT NOTE:** All development and testing is done on the remote server at root@10.0.1.125 under /opt/traefik-ui/. Local development server is NOT used. Always deploy changes to the remote server for testing via git pull.
 
 ## Project Overview
-**Version:** 0.0.7  
+**Version:** 0.6.3  
 **Type:** Enterprise-grade web interface for Traefik reverse proxy with network topology visualization, observability management, and remote proxy configuration  
 **Tech Stack:** Node.js (Express), Vanilla JavaScript, CSS3, Docker, dockerode
 
-## Version Management Policy
-**IMPORTANT:** Every completed phase increments version by 0.0.1
-- Phase completion = version bump in package.json files + CLAUDE.md update
-- Current: v0.0.7 (Phases 1-6 completed)
-- Next: v0.0.8 (Future enhancements)
-- Pattern: v0.0.X where X = completed phase count  
+## Version Management Policy (Updated 2025-06-10)
+**NEW SEMANTIC VERSIONING STRATEGY:**
+- **Bug Fixes & Minor Updates:** +0.0.1 (e.g., 0.6.2 → 0.6.3)
+- **Phases & Feature Additions:** +0.1.0 (e.g., 0.6.0 → 0.7.0)
+- **Major Architecture Changes:** +1.0.0 (future major releases)
+
+**Current Version Breakdown:**
+- **v0.6.3** = 6 completed phases + 3 bug fix cycles
+- **Phase Count:** 6 phases completed (Label Generator through Remote Proxy Config)
+- **Bug Fix Count:** 3 iterations (notification system, system config, modular architecture)
+- **Next Phase:** v0.7.0 (future feature development)
+- **Next Bug Fix:** v0.6.4 (if needed)  
 
 ### Core Purpose
 Eliminates manual editing of Traefik configuration files by providing a visual web interface for:

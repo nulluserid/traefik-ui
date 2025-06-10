@@ -1,6 +1,6 @@
 {
   "name": "traefik-ui",
-  "version": "0.0.7",
+  "version": "0.6.3",
   "description": "Simple web UI for managing Traefik configurations",
   "main": "server.js",
   "scripts": {
