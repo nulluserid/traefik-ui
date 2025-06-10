@@ -33,6 +33,8 @@ Eliminates manual editing of Traefik configuration files by providing a visual w
   - Traefik UI: http://10.0.1.125:3000
   - Traefik Dashboard: http://10.0.1.125:8080
 
+**IMPORTANT NOTE:** All development and testing is done on the remote server at root@10.0.1.125 under /opt/traefik-ui/. Local development server is NOT used. Always deploy changes to the remote server for testing via git pull.
+
 ### Remote Deployment Process
 ```bash
 # SSH to remote server
@@ -42,7 +44,7 @@ ssh root@10.0.1.125
 cd /opt/traefik-ui
 
 # Pull latest changes from Git
-git pull origin main
+git pull origin master
 
 # Restart containers to apply changes
 docker compose down && docker compose up -d --build

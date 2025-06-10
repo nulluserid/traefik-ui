@@ -1680,7 +1680,13 @@ function saveUIConfig(config) {
 function createBackup(config, backupName) {
   try {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = backupName || `ui-config-backup-${timestamp}.yml`;
+    let filename;
+    if (backupName) {
+      // Ensure custom backup names have .yml extension
+      filename = backupName.endsWith('.yml') ? backupName : `${backupName}.yml`;
+    } else {
+      filename = `ui-config-backup-${timestamp}.yml`;
+    }
     const backupPath = path.join(UI_BACKUPS_DIR, filename);
     
     // Add comprehensive backup metadata
