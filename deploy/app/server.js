@@ -1403,6 +1403,445 @@ function analyzeTracingConfig(staticConfig) {
   };
 }
 
+// Phase 5.5: Configuration Management System
+
+// UI Configuration file path
+const UI_CONFIG_PATH = path.join(__dirname, 'config', 'ui-config.yml');
+const UI_BACKUPS_DIR = path.join(__dirname, 'config', 'backups');
+
+// Ensure config directories exist
+if (!fs.existsSync(path.dirname(UI_CONFIG_PATH))) {
+  fs.mkdirSync(path.dirname(UI_CONFIG_PATH), { recursive: true });
+}
+if (!fs.existsSync(UI_BACKUPS_DIR)) {
+  fs.mkdirSync(UI_BACKUPS_DIR, { recursive: true });
+}
+
+// Default UI configuration structure
+const DEFAULT_UI_CONFIG = {
+  traefik_ui: {
+    version: '0.0.6',
+    dns_providers: [],
+    observability: {
+      presets: {
+        production: {
+          access_logs: { enabled: true, format: 'json', graylog: { enabled: false } },
+          metrics: { enabled: true, port: 8082, categories: { entrypoint: true, router: true, service: true } },
+          tracing: { enabled: true, backend: 'jaeger', samplingRate: 0.1 }
+        },
+        development: {
+          access_logs: { enabled: true, format: 'clf', graylog: { enabled: false } },
+          metrics: { enabled: true, port: 8082, categories: { entrypoint: true, router: false, service: false } },
+          tracing: { enabled: false }
+        },
+        minimal: {
+          access_logs: { enabled: false },
+          metrics: { enabled: false },
+          tracing: { enabled: false }
+        }
+      },
+      defaults: {
+        access_logs_format: 'json',
+        metrics_port: 8082,
+        tracing_backend: 'jaeger'
+      }
+    },
+    ui: {
+      theme: 'auto',
+      default_tls_method: 'letsencrypt-dns',
+      default_middleware: ['crowdsec-bouncer'],
+      network_scan_interval: 300,
+      auto_backup: true,
+      backup_retention_days: 30
+    },
+    templates: {
+      route_templates: {
+        'simple-web-app': {
+          name: 'Simple Web App',
+          description: 'Basic web application with Let\'s Encrypt SSL',
+          tls_method: 'letsencrypt-http',
+          middleware: []
+        },
+        'api-service': {
+          name: 'API Service',
+          description: 'REST API with CORS and rate limiting',
+          tls_method: 'letsencrypt-dns',
+          middleware: ['cors', 'rate-limit']
+        },
+        'protected-service': {
+          name: 'Protected Service',
+          description: 'Service with CrowdSec protection',
+          tls_method: 'letsencrypt-dns',
+          middleware: ['crowdsec-bouncer']
+        }
+      }
+    },
+    backup: {
+      created: new Date().toISOString(),
+      traefik_version: 'v3.0',
+      ui_version: '0.0.6'
+    }
+  }
+};
+
+// Helper functions for UI configuration management
+function loadUIConfig() {
+  try {
+    if (fs.existsSync(UI_CONFIG_PATH)) {
+      const content = fs.readFileSync(UI_CONFIG_PATH, 'utf8');
+      return yaml.load(content);
+    } else {
+      // Create default config if it doesn't exist
+      saveUIConfig(DEFAULT_UI_CONFIG);
+      return DEFAULT_UI_CONFIG;
+    }
+  } catch (error) {
+    console.error('Error loading UI config:', error);
+    return DEFAULT_UI_CONFIG;
+  }
+}
+
+function saveUIConfig(config) {
+  try {
+    // Update backup metadata
+    config.traefik_ui.backup.created = new Date().toISOString();
+    config.traefik_ui.version = '0.0.6';
+    
+    fs.writeFileSync(UI_CONFIG_PATH, yaml.dump(config, { lineWidth: -1 }));
+    return true;
+  } catch (error) {
+    console.error('Error saving UI config:', error);
+    return false;
+  }
+}
+
+function createBackup(config, backupName) {
+  try {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = backupName || `ui-config-backup-${timestamp}.yml`;
+    const backupPath = path.join(UI_BACKUPS_DIR, filename);
+    
+    // Add backup metadata
+    const backupConfig = {
+      ...config,
+      traefik_ui: {
+        ...config.traefik_ui,
+        backup: {
+          ...config.traefik_ui.backup,
+          backup_created: new Date().toISOString(),
+          backup_type: backupName ? 'manual' : 'automatic'
+        }
+      }
+    };
+    
+    fs.writeFileSync(backupPath, yaml.dump(backupConfig, { lineWidth: -1 }));
+    return { success: true, filename, path: backupPath };
+  } catch (error) {
+    console.error('Error creating backup:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+function validateUIConfig(config) {
+  const errors = [];
+  const warnings = [];
+  
+  try {
+    // Validate basic structure
+    if (!config.traefik_ui) {
+      errors.push('Missing traefik_ui root configuration');
+      return { valid: false, errors, warnings };
+    }
+    
+    const uiConfig = config.traefik_ui;
+    
+    // Validate DNS providers
+    if (uiConfig.dns_providers && Array.isArray(uiConfig.dns_providers)) {
+      uiConfig.dns_providers.forEach((provider, index) => {
+        if (!provider.name) {
+          errors.push(`DNS provider ${index + 1}: Missing name`);
+        }
+        if (!provider.type) {
+          errors.push(`DNS provider ${index + 1}: Missing type`);
+        }
+        if (provider.type === 'rfc2136' && provider.config) {
+          const required = ['nameserver', 'tsigKey', 'tsigSecret', 'tsigAlgorithm'];
+          required.forEach(field => {
+            if (!provider.config[field]) {
+              errors.push(`DNS provider ${provider.name}: Missing ${field}`);
+            }
+          });
+        }
+      });
+    }
+    
+    // Validate observability settings
+    if (uiConfig.observability?.defaults) {
+      const defaults = uiConfig.observability.defaults;
+      if (defaults.metrics_port && (defaults.metrics_port < 1024 || defaults.metrics_port > 65535)) {
+        warnings.push('Metrics port should be between 1024-65535');
+      }
+    }
+    
+    // Validate UI settings
+    if (uiConfig.ui) {
+      if (uiConfig.ui.theme && !['auto', 'light', 'dark'].includes(uiConfig.ui.theme)) {
+        warnings.push('UI theme should be auto, light, or dark');
+      }
+      if (uiConfig.ui.network_scan_interval && uiConfig.ui.network_scan_interval < 60) {
+        warnings.push('Network scan interval should be at least 60 seconds');
+      }
+    }
+    
+    return { valid: errors.length === 0, errors, warnings };
+  } catch (error) {
+    errors.push(`Configuration validation error: ${error.message}`);
+    return { valid: false, errors, warnings };
+  }
+}
+
+// Get full UI configuration
+app.get('/api/config/ui', (req, res) => {
+  try {
+    const config = loadUIConfig();
+    res.json(config);
+  } catch (error) {
+    console.error('UI config get error:', error);
+    res.status(500).json({ error: 'Failed to load UI configuration' });
+  }
+});
+
+// Update UI configuration
+app.put('/api/config/ui', (req, res) => {
+  try {
+    const newConfig = req.body;
+    
+    // Validate configuration
+    const validation = validateUIConfig(newConfig);
+    if (!validation.valid) {
+      return res.status(400).json({
+        error: 'Configuration validation failed',
+        errors: validation.errors,
+        warnings: validation.warnings
+      });
+    }
+    
+    // Create automatic backup before changes
+    const currentConfig = loadUIConfig();
+    const backup = createBackup(currentConfig);
+    
+    // Save new configuration
+    if (saveUIConfig(newConfig)) {
+      res.json({
+        success: true,
+        message: 'UI configuration updated successfully',
+        backup: backup.success ? backup.filename : null,
+        validation: validation
+      });
+    } else {
+      res.status(500).json({ error: 'Failed to save UI configuration' });
+    }
+  } catch (error) {
+    console.error('UI config update error:', error);
+    res.status(500).json({ error: 'Failed to update UI configuration' });
+  }
+});
+
+// Create manual backup
+app.post('/api/config/ui/backup', (req, res) => {
+  try {
+    const { name } = req.body;
+    const config = loadUIConfig();
+    const backup = createBackup(config, name);
+    
+    if (backup.success) {
+      res.json({
+        success: true,
+        message: 'Backup created successfully',
+        filename: backup.filename,
+        path: backup.path
+      });
+    } else {
+      res.status(500).json({ error: backup.error });
+    }
+  } catch (error) {
+    console.error('Backup creation error:', error);
+    res.status(500).json({ error: 'Failed to create backup' });
+  }
+});
+
+// List available backups
+app.get('/api/config/ui/backups', (req, res) => {
+  try {
+    const backups = [];
+    const files = fs.readdirSync(UI_BACKUPS_DIR);
+    
+    files.filter(file => file.endsWith('.yml')).forEach(file => {
+      const filePath = path.join(UI_BACKUPS_DIR, file);
+      const stats = fs.statSync(filePath);
+      
+      try {
+        const content = yaml.load(fs.readFileSync(filePath, 'utf8'));
+        backups.push({
+          filename: file,
+          created: stats.mtime.toISOString(),
+          size: stats.size,
+          version: content.traefik_ui?.version || 'unknown',
+          type: content.traefik_ui?.backup?.backup_type || 'unknown'
+        });
+      } catch (error) {
+        // Skip invalid backup files
+        console.warn(`Invalid backup file: ${file}`);
+      }
+    });
+    
+    // Sort by creation date (newest first)
+    backups.sort((a, b) => new Date(b.created) - new Date(a.created));
+    
+    res.json({ backups });
+  } catch (error) {
+    console.error('Backup list error:', error);
+    res.status(500).json({ error: 'Failed to list backups' });
+  }
+});
+
+// Restore from backup
+app.post('/api/config/ui/restore', (req, res) => {
+  try {
+    const { filename } = req.body;
+    const backupPath = path.join(UI_BACKUPS_DIR, filename);
+    
+    if (!fs.existsSync(backupPath)) {
+      return res.status(404).json({ error: 'Backup file not found' });
+    }
+    
+    // Load and validate backup
+    const backupConfig = yaml.load(fs.readFileSync(backupPath, 'utf8'));
+    const validation = validateUIConfig(backupConfig);
+    
+    if (!validation.valid) {
+      return res.status(400).json({
+        error: 'Backup validation failed',
+        errors: validation.errors,
+        warnings: validation.warnings
+      });
+    }
+    
+    // Create backup of current config before restore
+    const currentConfig = loadUIConfig();
+    const currentBackup = createBackup(currentConfig, `pre-restore-${Date.now()}`);
+    
+    // Restore configuration
+    if (saveUIConfig(backupConfig)) {
+      res.json({
+        success: true,
+        message: 'Configuration restored successfully',
+        restored_from: filename,
+        current_backup: currentBackup.success ? currentBackup.filename : null,
+        validation: validation
+      });
+    } else {
+      res.status(500).json({ error: 'Failed to restore configuration' });
+    }
+  } catch (error) {
+    console.error('Restore error:', error);
+    res.status(500).json({ error: 'Failed to restore from backup' });
+  }
+});
+
+// Export configuration for download
+app.get('/api/config/ui/export', (req, res) => {
+  try {
+    const config = loadUIConfig();
+    const timestamp = new Date().toISOString().split('T')[0];
+    const filename = `traefik-ui-config-${timestamp}.yml`;
+    
+    res.setHeader('Content-Type', 'application/x-yaml');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(yaml.dump(config, { lineWidth: -1 }));
+  } catch (error) {
+    console.error('Export error:', error);
+    res.status(500).json({ error: 'Failed to export configuration' });
+  }
+});
+
+// Import configuration from upload
+app.post('/api/config/ui/import', (req, res) => {
+  try {
+    const { config, validate_only = false } = req.body;
+    
+    let importedConfig;
+    try {
+      importedConfig = typeof config === 'string' ? yaml.load(config) : config;
+    } catch (error) {
+      return res.status(400).json({ error: 'Invalid YAML format' });
+    }
+    
+    // Validate configuration
+    const validation = validateUIConfig(importedConfig);
+    
+    if (validate_only) {
+      return res.json({
+        valid: validation.valid,
+        errors: validation.errors,
+        warnings: validation.warnings,
+        preview: importedConfig
+      });
+    }
+    
+    if (!validation.valid) {
+      return res.status(400).json({
+        error: 'Configuration validation failed',
+        errors: validation.errors,
+        warnings: validation.warnings
+      });
+    }
+    
+    // Create backup before import
+    const currentConfig = loadUIConfig();
+    const backup = createBackup(currentConfig, `pre-import-${Date.now()}`);
+    
+    // Import configuration
+    if (saveUIConfig(importedConfig)) {
+      res.json({
+        success: true,
+        message: 'Configuration imported successfully',
+        backup: backup.success ? backup.filename : null,
+        validation: validation
+      });
+    } else {
+      res.status(500).json({ error: 'Failed to import configuration' });
+    }
+  } catch (error) {
+    console.error('Import error:', error);
+    res.status(500).json({ error: 'Failed to import configuration' });
+  }
+});
+
+// Validate configuration without saving
+app.post('/api/config/ui/validate', (req, res) => {
+  try {
+    const { config } = req.body;
+    
+    let configToValidate;
+    try {
+      configToValidate = typeof config === 'string' ? yaml.load(config) : config;
+    } catch (error) {
+      return res.status(400).json({ 
+        valid: false, 
+        errors: ['Invalid YAML format'], 
+        warnings: [] 
+      });
+    }
+    
+    const validation = validateUIConfig(configToValidate);
+    res.json(validation);
+  } catch (error) {
+    console.error('Validation error:', error);
+    res.status(500).json({ error: 'Failed to validate configuration' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Traefik UI running on http://localhost:${PORT}`);
 });

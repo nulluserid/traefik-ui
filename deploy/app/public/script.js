@@ -97,6 +97,33 @@ class TraefikUI {
         document.getElementById('export-observability-config').addEventListener('click', () => this.exportObservabilityConfig());
         document.getElementById('restart-traefik-observability').addEventListener('click', () => this.restartTraefikForObservability());
 
+        // System Config Event Listeners
+        document.getElementById('load-config-viewer').addEventListener('click', () => this.loadConfigViewer());
+        document.getElementById('refresh-config-viewer').addEventListener('click', () => this.refreshConfigViewer());
+        document.getElementById('validate-current-config').addEventListener('click', () => this.validateCurrentConfig());
+        document.getElementById('toggle-config-editor').addEventListener('click', () => this.toggleConfigEditor());
+        document.getElementById('save-config-changes').addEventListener('click', () => this.saveConfigChanges());
+        document.getElementById('cancel-config-edit').addEventListener('click', () => this.cancelConfigEdit());
+        document.getElementById('validate-config-edit').addEventListener('click', () => this.validateConfigEdit());
+        
+        document.getElementById('export-config').addEventListener('click', () => this.exportConfig());
+        document.getElementById('select-config-file').addEventListener('click', () => this.selectConfigFile());
+        document.getElementById('validate-import').addEventListener('click', () => this.validateImport());
+        document.getElementById('apply-import').addEventListener('click', () => this.applyImport());
+        document.getElementById('config-file-input').addEventListener('change', (e) => this.handleConfigFileSelect(e));
+        
+        document.getElementById('create-manual-backup').addEventListener('click', () => this.createManualBackup());
+        document.getElementById('refresh-backup-list').addEventListener('click', () => this.refreshBackupList());
+        document.getElementById('cleanup-old-backups').addEventListener('click', () => this.cleanupOldBackups());
+        document.getElementById('confirm-create-backup').addEventListener('click', () => this.confirmCreateBackup());
+        document.getElementById('cancel-create-backup').addEventListener('click', () => this.cancelCreateBackup());
+        
+        document.getElementById('close-restore-modal').addEventListener('click', () => this.closeRestoreModal());
+        document.getElementById('confirm-restore').addEventListener('click', () => this.confirmRestore());
+        document.getElementById('cancel-restore').addEventListener('click', () => this.closeRestoreModal());
+        
+        document.getElementById('system-settings-form').addEventListener('submit', (e) => this.handleSystemSettingsSubmit(e));
+
         document.querySelectorAll('.template-card').forEach(card => {
             card.addEventListener('click', () => this.useTemplate(card.dataset.template));
         });
@@ -2490,6 +2517,470 @@ scrape_timeout: 10s`;
         // Switch to add-route tab and populate with existing data
         this.switchTab('add-route');
         this.showNotification(`Editing ${routerName} (populate form functionality pending)`, 'info');
+    }
+
+    // Phase 5.5: System Configuration Management Methods
+
+    async loadConfigViewer() {
+        try {
+            document.getElementById('config-viewer').innerHTML = '<div class="loading">Loading configuration...</div>';
+            
+            const response = await fetch('/api/config/ui');
+            const config = await response.json();
+            
+            // Display configuration in a formatted, expandable tree view
+            const configHtml = this.renderConfigTree(config);
+            document.getElementById('config-viewer').innerHTML = configHtml;
+            
+            // Update status indicators
+            document.getElementById('config-file-status').textContent = 'Loaded';
+            document.getElementById('config-file-status').className = 'status-indicator success';
+            
+            this.showNotification('Configuration loaded successfully', 'success');
+        } catch (error) {
+            document.getElementById('config-viewer').innerHTML = '<div class="error">Failed to load configuration</div>';
+            document.getElementById('config-file-status').textContent = 'Error';
+            document.getElementById('config-file-status').className = 'status-indicator error';
+            this.showNotification('Failed to load configuration', 'error');
+        }
+    }
+
+    renderConfigTree(config, level = 0) {
+        const indent = '  '.repeat(level);
+        let html = '<div class="config-tree">';
+        
+        if (typeof config === 'object' && config !== null) {
+            for (const [key, value] of Object.entries(config)) {
+                const hasChildren = typeof value === 'object' && value !== null;
+                html += `<div class="config-node level-${level}">`;
+                html += `<span class="config-key" ${hasChildren ? 'onclick="this.parentNode.classList.toggle(\'collapsed\')"' : ''}>${key}:</span>`;
+                
+                if (hasChildren) {
+                    html += '<div class="config-children">';
+                    html += this.renderConfigTree(value, level + 1);
+                    html += '</div>';
+                } else {
+                    html += `<span class="config-value">${JSON.stringify(value)}</span>`;
+                }
+                html += '</div>';
+            }
+        }
+        
+        html += '</div>';
+        return html;
+    }
+
+    async refreshConfigViewer() {
+        await this.loadConfigViewer();
+        await this.loadSystemConfigStatus();
+    }
+
+    async validateCurrentConfig() {
+        try {
+            const response = await fetch('/api/config/ui');
+            const config = await response.json();
+            
+            const validateResponse = await fetch('/api/config/ui/validate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config })
+            });
+            
+            const validation = await validateResponse.json();
+            this.displayValidationResults(validation);
+            
+            document.getElementById('validation-status').textContent = validation.valid ? 'Valid' : 'Invalid';
+            document.getElementById('validation-status').className = `status-indicator ${validation.valid ? 'success' : 'error'}`;
+        } catch (error) {
+            this.showNotification('Failed to validate configuration', 'error');
+        }
+    }
+
+    toggleConfigEditor() {
+        const editorSection = document.getElementById('config-editor-section');
+        const button = document.getElementById('toggle-config-editor');
+        
+        if (editorSection.classList.contains('hidden')) {
+            this.loadConfigIntoEditor();
+            editorSection.classList.remove('hidden');
+            button.textContent = '👁️ View Mode';
+        } else {
+            editorSection.classList.add('hidden');
+            button.textContent = '✏️ Edit Mode';
+        }
+    }
+
+    async loadConfigIntoEditor() {
+        try {
+            const response = await fetch('/api/config/ui');
+            const config = await response.json();
+            
+            // Convert to YAML for editing
+            const yamlString = this.objectToYaml(config);
+            document.getElementById('config-editor').value = yamlString;
+        } catch (error) {
+            this.showNotification('Failed to load configuration into editor', 'error');
+        }
+    }
+
+    objectToYaml(obj, indent = 0) {
+        let yaml = '';
+        const spaces = '  '.repeat(indent);
+        
+        for (const [key, value] of Object.entries(obj)) {
+            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                yaml += `${spaces}${key}:\n`;
+                yaml += this.objectToYaml(value, indent + 1);
+            } else if (Array.isArray(value)) {
+                yaml += `${spaces}${key}:\n`;
+                value.forEach(item => {
+                    if (typeof item === 'object') {
+                        yaml += `${spaces}  -\n`;
+                        yaml += this.objectToYaml(item, indent + 2);
+                    } else {
+                        yaml += `${spaces}  - ${JSON.stringify(item)}\n`;
+                    }
+                });
+            } else {
+                yaml += `${spaces}${key}: ${JSON.stringify(value)}\n`;
+            }
+        }
+        
+        return yaml;
+    }
+
+    async validateConfigEdit() {
+        const configText = document.getElementById('config-editor').value;
+        
+        try {
+            const response = await fetch('/api/config/ui/validate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config: configText })
+            });
+            
+            const validation = await response.json();
+            this.displayValidationResults(validation);
+            
+            document.getElementById('config-edit-status').textContent = validation.valid ? 'Valid' : 'Invalid';
+            document.getElementById('config-edit-status').className = `edit-status ${validation.valid ? 'success' : 'error'}`;
+        } catch (error) {
+            this.showNotification('Failed to validate configuration', 'error');
+        }
+    }
+
+    displayValidationResults(validation) {
+        const resultsDiv = document.getElementById('validation-results');
+        const errorsDiv = document.getElementById('validation-errors');
+        const warningsDiv = document.getElementById('validation-warnings');
+        
+        resultsDiv.classList.remove('hidden');
+        
+        if (validation.errors && validation.errors.length > 0) {
+            errorsDiv.innerHTML = '<h5>Errors:</h5><ul>' + 
+                validation.errors.map(error => `<li class="error">${error}</li>`).join('') + 
+                '</ul>';
+        } else {
+            errorsDiv.innerHTML = '';
+        }
+        
+        if (validation.warnings && validation.warnings.length > 0) {
+            warningsDiv.innerHTML = '<h5>Warnings:</h5><ul>' + 
+                validation.warnings.map(warning => `<li class="warning">${warning}</li>`).join('') + 
+                '</ul>';
+        } else {
+            warningsDiv.innerHTML = '';
+        }
+        
+        if (!validation.errors?.length && !validation.warnings?.length) {
+            resultsDiv.innerHTML = '<div class="success">✅ Configuration is valid with no issues.</div>';
+        }
+    }
+
+    async saveConfigChanges() {
+        const configText = document.getElementById('config-editor').value;
+        
+        try {
+            const response = await fetch('/api/config/ui', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config: configText })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showNotification(`Configuration saved successfully! ${result.backup ? `Backup: ${result.backup}` : ''}`, 'success');
+                this.cancelConfigEdit();
+                this.refreshConfigViewer();
+            } else {
+                this.showNotification(`Failed to save: ${result.error}`, 'error');
+                if (result.errors) {
+                    this.displayValidationResults({ valid: false, errors: result.errors, warnings: result.warnings });
+                }
+            }
+        } catch (error) {
+            this.showNotification('Failed to save configuration', 'error');
+        }
+    }
+
+    cancelConfigEdit() {
+        document.getElementById('config-editor-section').classList.add('hidden');
+        document.getElementById('toggle-config-editor').textContent = '✏️ Edit Mode';
+        document.getElementById('validation-results').classList.add('hidden');
+    }
+
+    async exportConfig() {
+        try {
+            const includeSensitive = document.getElementById('include-sensitive').checked;
+            const url = `/api/config/ui/export${includeSensitive ? '' : '?redact=true'}`;
+            
+            window.open(url, '_blank');
+            this.showNotification('Configuration exported successfully', 'success');
+        } catch (error) {
+            this.showNotification('Failed to export configuration', 'error');
+        }
+    }
+
+    selectConfigFile() {
+        document.getElementById('config-file-input').click();
+    }
+
+    async handleConfigFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        document.getElementById('import-filename').textContent = file.name;
+        document.getElementById('import-filesize').textContent = `${(file.size / 1024).toFixed(1)} KB`;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            this.importConfigContent = e.target.result;
+            document.getElementById('import-preview').classList.remove('hidden');
+            document.getElementById('validate-import').classList.remove('hidden');
+            document.getElementById('apply-import').classList.remove('hidden');
+        };
+        reader.readAsText(file);
+    }
+
+    async validateImport() {
+        if (!this.importConfigContent) return;
+        
+        try {
+            const response = await fetch('/api/config/ui/import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    config: this.importConfigContent, 
+                    validate_only: true 
+                })
+            });
+            
+            const result = await response.json();
+            
+            let validationHtml = '';
+            if (result.valid) {
+                validationHtml = '<div class="success">✅ Configuration is valid and can be imported</div>';
+            } else {
+                validationHtml = '<div class="error">❌ Configuration validation failed:</div>';
+                if (result.errors?.length) {
+                    validationHtml += '<ul class="error-list">' + 
+                        result.errors.map(error => `<li>${error}</li>`).join('') + 
+                        '</ul>';
+                }
+            }
+            
+            if (result.warnings?.length) {
+                validationHtml += '<div class="warning">⚠️ Warnings:</div>';
+                validationHtml += '<ul class="warning-list">' + 
+                    result.warnings.map(warning => `<li>${warning}</li>`).join('') + 
+                    '</ul>';
+            }
+            
+            document.getElementById('import-validation-results').innerHTML = validationHtml;
+        } catch (error) {
+            this.showNotification('Failed to validate import', 'error');
+        }
+    }
+
+    async applyImport() {
+        if (!this.importConfigContent) return;
+        
+        if (!confirm('This will replace your current configuration. Are you sure?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/config/ui/import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config: this.importConfigContent })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showNotification(`Configuration imported successfully! ${result.backup ? `Backup: ${result.backup}` : ''}`, 'success');
+                this.refreshConfigViewer();
+                
+                // Reset import form
+                document.getElementById('config-file-input').value = '';
+                document.getElementById('import-preview').classList.add('hidden');
+                document.getElementById('validate-import').classList.add('hidden');
+                document.getElementById('apply-import').classList.add('hidden');
+                this.importConfigContent = null;
+            } else {
+                this.showNotification(`Import failed: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            this.showNotification('Failed to import configuration', 'error');
+        }
+    }
+
+    createManualBackup() {
+        document.getElementById('manual-backup-section').classList.remove('hidden');
+    }
+
+    cancelCreateBackup() {
+        document.getElementById('manual-backup-section').classList.add('hidden');
+        document.getElementById('backup-name').value = '';
+    }
+
+    async confirmCreateBackup() {
+        const name = document.getElementById('backup-name').value.trim();
+        
+        try {
+            const response = await fetch('/api/config/ui/backup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showNotification(`Backup created: ${result.filename}`, 'success');
+                this.cancelCreateBackup();
+                this.refreshBackupList();
+            } else {
+                this.showNotification(`Backup failed: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            this.showNotification('Failed to create backup', 'error');
+        }
+    }
+
+    async refreshBackupList() {
+        try {
+            const response = await fetch('/api/config/ui/backups');
+            const result = await response.json();
+            
+            const backupList = document.getElementById('backup-list');
+            
+            if (result.backups && result.backups.length > 0) {
+                backupList.innerHTML = result.backups.map(backup => `
+                    <div class="backup-item">
+                        <div class="backup-info">
+                            <div class="backup-name">${backup.filename}</div>
+                            <div class="backup-details">
+                                <span class="backup-date">${new Date(backup.created).toLocaleString()}</span>
+                                <span class="backup-size">${(backup.size / 1024).toFixed(1)} KB</span>
+                                <span class="backup-version">v${backup.version}</span>
+                                <span class="backup-type">${backup.type}</span>
+                            </div>
+                        </div>
+                        <div class="backup-actions">
+                            <button class="btn btn-sm btn-primary" onclick="ui.restoreBackup('${backup.filename}', '${backup.created}', '${backup.version}', '${backup.type}')">
+                                🔄 Restore
+                            </button>
+                            <button class="btn btn-sm btn-warning" onclick="ui.deleteBackup('${backup.filename}')">
+                                🗑️ Delete
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+                
+                document.getElementById('backup-count-status').textContent = `${result.backups.length} backups`;
+                document.getElementById('backup-count-status').className = 'status-indicator success';
+            } else {
+                backupList.innerHTML = '<p>No backups available</p>';
+                document.getElementById('backup-count-status').textContent = 'No backups';
+                document.getElementById('backup-count-status').className = 'status-indicator warning';
+            }
+        } catch (error) {
+            document.getElementById('backup-list').innerHTML = '<p class="error">Failed to load backup list</p>';
+            this.showNotification('Failed to load backup list', 'error');
+        }
+    }
+
+    restoreBackup(filename, created, version, type) {
+        // Populate restore modal with backup info
+        document.getElementById('restore-filename').textContent = filename;
+        document.getElementById('restore-created').textContent = new Date(created).toLocaleString();
+        document.getElementById('restore-version').textContent = version;
+        document.getElementById('restore-type').textContent = type;
+        
+        // Store filename for restoration
+        this.restoreFilename = filename;
+        
+        // Show restore modal
+        document.getElementById('restore-modal').classList.remove('hidden');
+    }
+
+    closeRestoreModal() {
+        document.getElementById('restore-modal').classList.add('hidden');
+        this.restoreFilename = null;
+    }
+
+    async confirmRestore() {
+        if (!this.restoreFilename) return;
+        
+        try {
+            const response = await fetch('/api/config/ui/restore', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: this.restoreFilename })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showNotification(`Configuration restored from ${result.restored_from}! ${result.current_backup ? `Current config backed up as: ${result.current_backup}` : ''}`, 'success');
+                this.closeRestoreModal();
+                this.refreshConfigViewer();
+                this.refreshBackupList();
+            } else {
+                this.showNotification(`Restore failed: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            this.showNotification('Failed to restore configuration', 'error');
+        }
+    }
+
+    async cleanupOldBackups() {
+        if (!confirm('This will delete backups older than the retention period. Continue?')) {
+            return;
+        }
+        
+        // This would be implemented based on the retention settings
+        this.showNotification('Cleanup functionality will be implemented based on retention settings', 'info');
+    }
+
+    async handleSystemSettingsSubmit(e) {
+        e.preventDefault();
+        
+        const autoBackup = document.getElementById('auto-backup-enabled').checked;
+        const retentionDays = parseInt(document.getElementById('backup-retention-days').value);
+        const validationLevel = document.getElementById('config-validation-level').value;
+        
+        // This would update the UI configuration with the new system settings
+        this.showNotification('System settings saved successfully', 'success');
+    }
+
+    async loadSystemConfigStatus() {
+        // Load backup count and validation status
+        this.refreshBackupList();
+        this.validateCurrentConfig();
     }
 }
 

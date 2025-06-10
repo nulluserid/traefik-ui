@@ -37,6 +37,7 @@
                 <span class="nav-group-label">🛠️ Tools</span>
                 <button class="tab-btn" data-tab="label-generator">Label Generator</button>
                 <button class="tab-btn" data-tab="templates">Templates</button>
+                <button class="tab-btn" data-tab="system-config">System Config</button>
             </div>
         </nav>
 
@@ -875,6 +876,190 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...
                         <button class="btn btn-secondary">Use Template</button>
                     </div>
                     
+                </div>
+            </div>
+        </div>
+
+        <div id="system-config" class="tab-content">
+            <div class="section">
+                <h2>System Configuration Management</h2>
+                <p>Manage, backup, and restore your complete Traefik UI configuration. All DNS providers, observability settings, UI preferences, and templates are stored in a unified configuration file.</p>
+                
+                <div class="config-status-grid">
+                    <div class="config-status-card">
+                        <h4>📁 Configuration File</h4>
+                        <div id="config-file-status" class="status-indicator">Loading...</div>
+                        <small id="config-file-path">/config/ui-config.yml</small>
+                    </div>
+                    <div class="config-status-card">
+                        <h4>🗃️ Backups Available</h4>
+                        <div id="backup-count-status" class="status-indicator">Loading...</div>
+                        <small>Automatic & manual backups</small>
+                    </div>
+                    <div class="config-status-card">
+                        <h4>✅ Validation Status</h4>
+                        <div id="validation-status" class="status-indicator">Valid</div>
+                        <small>Configuration integrity</small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>📄 Configuration Viewer</h2>
+                <div class="config-viewer-controls">
+                    <button id="load-config-viewer" class="btn btn-primary">📖 Load Configuration</button>
+                    <button id="refresh-config-viewer" class="btn btn-secondary">🔄 Refresh</button>
+                    <button id="validate-current-config" class="btn btn-secondary">✅ Validate</button>
+                    <button id="toggle-config-editor" class="btn btn-secondary">✏️ Edit Mode</button>
+                </div>
+                
+                <div id="config-viewer" class="config-viewer-container">
+                    <div class="config-placeholder">
+                        <p>Click "Load Configuration" to view the current system configuration.</p>
+                    </div>
+                </div>
+                
+                <div id="config-editor-section" class="config-editor-section hidden">
+                    <div class="editor-controls">
+                        <button id="save-config-changes" class="btn btn-primary">💾 Save Changes</button>
+                        <button id="cancel-config-edit" class="btn btn-secondary">❌ Cancel</button>
+                        <button id="validate-config-edit" class="btn btn-secondary">🧪 Validate</button>
+                        <span id="config-edit-status" class="edit-status"></span>
+                    </div>
+                    <textarea id="config-editor" rows="20" placeholder="YAML configuration will appear here..."></textarea>
+                    
+                    <div id="validation-results" class="validation-results hidden">
+                        <h4>Validation Results</h4>
+                        <div id="validation-errors" class="validation-errors"></div>
+                        <div id="validation-warnings" class="validation-warnings"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>📦 Export & Import</h2>
+                <div class="export-import-grid">
+                    <div class="export-section">
+                        <h3>📤 Export Configuration</h3>
+                        <p>Download your complete configuration as a YAML file for backup or migration.</p>
+                        <button id="export-config" class="btn btn-primary">📥 Download Configuration</button>
+                        <div class="export-options">
+                            <label>
+                                <input type="checkbox" id="include-sensitive" checked> Include sensitive data (TSIG secrets, etc.)
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="import-section">
+                        <h3>📤 Import Configuration</h3>
+                        <p>Upload and apply a configuration file. Changes will be validated before application.</p>
+                        <input type="file" id="config-file-input" accept=".yml,.yaml" style="display: none;">
+                        <button id="select-config-file" class="btn btn-secondary">📁 Select File</button>
+                        <button id="validate-import" class="btn btn-secondary hidden">🧪 Validate Only</button>
+                        <button id="apply-import" class="btn btn-primary hidden">✅ Apply Configuration</button>
+                        
+                        <div id="import-preview" class="import-preview hidden">
+                            <h4>Import Preview</h4>
+                            <div id="import-validation-results"></div>
+                            <div class="import-file-info">
+                                <span id="import-filename"></span>
+                                <span id="import-filesize"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>🗄️ Backup & Restore</h2>
+                <div class="backup-restore-controls">
+                    <button id="create-manual-backup" class="btn btn-primary">💾 Create Backup</button>
+                    <button id="refresh-backup-list" class="btn btn-secondary">🔄 Refresh List</button>
+                    <button id="cleanup-old-backups" class="btn btn-warning">🧹 Cleanup Old Backups</button>
+                </div>
+                
+                <div id="manual-backup-section" class="manual-backup-section hidden">
+                    <div class="form-group">
+                        <label for="backup-name">Backup Name (optional):</label>
+                        <input type="text" id="backup-name" placeholder="e.g., pre-migration, stable-config">
+                        <small>Leave empty for automatic timestamp naming</small>
+                    </div>
+                    <div class="backup-form-actions">
+                        <button id="confirm-create-backup" class="btn btn-primary">✅ Create Backup</button>
+                        <button id="cancel-create-backup" class="btn btn-secondary">❌ Cancel</button>
+                    </div>
+                </div>
+                
+                <div class="backup-history">
+                    <h3>Backup History</h3>
+                    <div id="backup-list" class="backup-list-container">
+                        <p>Loading backup history...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>⚙️ System Settings</h2>
+                <form id="system-settings-form" class="form">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="auto-backup-enabled" checked> Enable Automatic Backups
+                        </label>
+                        <small>Create backups before major configuration changes</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="backup-retention-days">Backup Retention (days):</label>
+                        <input type="number" id="backup-retention-days" value="30" min="1" max="365">
+                        <small>Automatically delete backups older than this many days</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="config-validation-level">Validation Level:</label>
+                        <select id="config-validation-level">
+                            <option value="strict">Strict (reject any warnings)</option>
+                            <option value="normal" selected>Normal (allow warnings)</option>
+                            <option value="permissive">Permissive (minimal validation)</option>
+                        </select>
+                        <small>How strictly to validate configuration changes</small>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">💾 Save Settings</button>
+                </form>
+            </div>
+            
+            <div id="restore-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Restore Configuration</h3>
+                        <button class="modal-close" id="close-restore-modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="restore-warning">
+                            <h4>⚠️ Warning</h4>
+                            <p>This will replace your current configuration with the selected backup. Your current configuration will be automatically backed up before restoration.</p>
+                        </div>
+                        
+                        <div class="restore-info">
+                            <div class="restore-detail">
+                                <strong>Backup:</strong> <span id="restore-filename"></span>
+                            </div>
+                            <div class="restore-detail">
+                                <strong>Created:</strong> <span id="restore-created"></span>
+                            </div>
+                            <div class="restore-detail">
+                                <strong>Version:</strong> <span id="restore-version"></span>
+                            </div>
+                            <div class="restore-detail">
+                                <strong>Type:</strong> <span id="restore-type"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="modal-actions">
+                            <button id="confirm-restore" class="btn btn-warning">⚠️ Restore Configuration</button>
+                            <button id="cancel-restore" class="btn btn-secondary">Cancel</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
