@@ -7,7 +7,14 @@ This file provides comprehensive guidance to Claude Code (claude.ai/code) when w
 ## Project Overview
 **Version:** 0.0.6  
 **Type:** Enterprise-grade web interface for Traefik reverse proxy with network topology visualization and observability management  
-**Tech Stack:** Node.js (Express), Vanilla JavaScript, CSS3, Docker, dockerode  
+**Tech Stack:** Node.js (Express), Vanilla JavaScript, CSS3, Docker, dockerode
+
+## Version Management Policy
+**IMPORTANT:** Every completed phase increments version by 0.0.1
+- Phase completion = version bump in package.json files + CLAUDE.md update
+- Current: v0.0.6 (Phases 1-5.5 completed)
+- Next: v0.0.7 (Phase 6: Remote Proxy Configuration)
+- Pattern: v0.0.X where X = completed phase count  
 
 ### Core Purpose
 Eliminates manual editing of Traefik configuration files by providing a visual web interface for:
@@ -106,10 +113,16 @@ This project has both a standalone version (root directory) and a complete deplo
 - Validation for RFC2136 parameters and TSIG algorithms
 
 ### Frontend Architecture (Vanilla JavaScript)
-**Single-Class Design**:
-- `TraefikUI` class handles all functionality
+**Modular Architecture** (NEW in v0.0.6):
+- **`js/traefik-ui.js`** - Main orchestrator class with initialization and tab management
+- **`js/utils.js`** - Shared utilities (API requests, notifications, validation, helpers)
+- **`js/ui-components.js`** - Reusable UI components (modals, tables, forms, cards)
+- **`js/core-config.js`** - Route/service/DNS/TLS/middleware management
+- **`js/network-manager.js`** - Docker service discovery and network operations
+- **`js/observability.js`** - Domain monitoring, health checks, and observability configuration
 - Event-driven architecture with DOM manipulation
 - No frameworks - pure JavaScript with fetch API
+- **Organized modular design for maintainability and future expansion**
 
 **Theme System**:
 - **Enhanced cyberpunk theme with improved contrast** (UPDATED in v0.0.5)
