@@ -196,11 +196,13 @@ header {
 
 .middleware-type {
     font-size: 12px;
-    background: var(--accent-color);
-    color: white;
+    background: linear-gradient(135deg, var(--neon-purple), #6b2c91);
+    color: #ffffff;
     padding: 4px 8px;
     border-radius: 4px;
     margin-left: 10px;
+    font-weight: 600;
+    text-shadow: 0 0 3px rgba(0,0,0,0.5);
 }
 
 .middleware-config {
@@ -309,17 +311,17 @@ h1 {
     border-left: 3px solid var(--accent-color);
 }
 
-/* Cyberpunk nav group styling */
+/* Cyberpunk nav group styling - subtle glow for readability */
 [data-theme="dark"] .nav-group-label {
     background: linear-gradient(135deg, var(--bg-tertiary), rgba(0,255,255,0.05));
-    text-shadow: 0 0 5px var(--accent-color);
+    text-shadow: 0 0 1px rgba(0,255,255,0.8);
     border-left: 3px solid var(--neon-cyan);
 }
 
 @media (prefers-color-scheme: dark) {
     .nav-group-label {
         background: linear-gradient(135deg, var(--bg-tertiary), rgba(0,255,255,0.05));
-        text-shadow: 0 0 5px var(--accent-color);
+        text-shadow: 0 0 1px rgba(0,255,255,0.8);
         border-left: 3px solid var(--neon-cyan);
     }
 }
@@ -360,28 +362,28 @@ h1 {
     font-weight: 600;
 }
 
-/* Cyberpunk tab glow effect */
+/* Cyberpunk tab glow effect - reduced for better readability */
 [data-theme="dark"] .tab-btn.active {
     box-shadow: 
-        0 0 10px rgba(0,255,255,0.3),
-        inset 0 0 20px rgba(0,255,255,0.1);
-    text-shadow: 0 0 5px var(--accent-color);
+        0 0 8px rgba(0,255,255,0.2),
+        inset 0 0 15px rgba(0,255,255,0.08);
+    text-shadow: 0 0 2px rgba(0,255,255,0.6);
 }
 
 [data-theme="dark"] .tab-btn:hover {
-    text-shadow: 0 0 5px var(--accent-color);
+    text-shadow: 0 0 2px rgba(0,255,255,0.4);
 }
 
 @media (prefers-color-scheme: dark) {
     .tab-btn.active {
         box-shadow: 
-            0 0 10px rgba(0,255,255,0.3),
-            inset 0 0 20px rgba(0,255,255,0.1);
-        text-shadow: 0 0 5px var(--accent-color);
+            0 0 8px rgba(0,255,255,0.2),
+            inset 0 0 15px rgba(0,255,255,0.08);
+        text-shadow: 0 0 2px rgba(0,255,255,0.6);
     }
     
     .tab-btn:hover {
-        text-shadow: 0 0 5px var(--accent-color);
+        text-shadow: 0 0 2px rgba(0,255,255,0.4);
     }
 }
 
@@ -458,16 +460,16 @@ h1 {
     font-weight: 600;
 }
 
-/* Cyberpunk heading glow */
+/* Cyberpunk heading glow - subtle for readability */
 [data-theme="dark"] .section h2 {
-    text-shadow: 0 0 10px var(--accent-color);
+    text-shadow: 0 0 3px rgba(0,255,255,0.7);
     border-bottom: 2px solid transparent;
     border-image: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple), var(--neon-cyan)) 1;
 }
 
 @media (prefers-color-scheme: dark) {
     .section h2 {
-        text-shadow: 0 0 10px var(--accent-color);
+        text-shadow: 0 0 3px rgba(0,255,255,0.7);
         border-bottom: 2px solid transparent;
         border-image: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple), var(--neon-cyan)) 1;
     }
@@ -843,11 +845,13 @@ h1 {
 }
 
 .dns-provider-type {
-    background: var(--accent-color);
-    color: white;
+    background: linear-gradient(135deg, var(--neon-pink), #cc0066);
+    color: #ffffff;
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 0.8em;
+    font-weight: 600;
+    text-shadow: 0 0 3px rgba(0,0,0,0.5);
 }
 
 .dns-provider-details {
@@ -1158,9 +1162,10 @@ h1 {
 }
 
 .status-badge.traefik-enabled {
-    background: linear-gradient(135deg, var(--accent-color), #0099cc);
-    color: #000000;
-    text-shadow: 0 0 5px rgba(0,0,0,0.5);
+    background: linear-gradient(135deg, var(--neon-purple), #6b2c91);
+    color: #ffffff;
+    text-shadow: 0 0 3px rgba(0,0,0,0.5);
+    font-weight: 600;
 }
 
 .status-badge.traefik-disabled {
@@ -1291,11 +1296,14 @@ h1 {
 }
 
 .network-driver {
-    background: var(--accent-color);
-    color: white;
+    background: linear-gradient(135deg, #2d1b69, #5a3785);
+    color: #ffffff;
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 0.8em;
+    font-weight: 600;
+    text-shadow: 0 0 3px rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.2);
 }
 
 .network-details {
