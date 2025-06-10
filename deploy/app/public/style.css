@@ -5,6 +5,14 @@
 }
 
 :root {
+    /* Global cyberpunk neon colors - available in all themes */
+    --neon-cyan: #00ffff;
+    --neon-pink: #ff0080;
+    --neon-green: #00ff88;
+    --neon-purple: #a855f7;
+    --neon-orange: #ff8800;
+    --neon-blue: #0088ff;
+    
     /* Light theme (default) */
     --bg-primary: #f5f5f5;
     --bg-secondary: #ffffff;
@@ -23,14 +31,6 @@
     --danger-hover: #c82333;
     --shadow: rgba(0,0,0,0.1);
     --shadow-hover: rgba(0,0,0,0.15);
-    
-    /* Cyberpunk neon colors */
-    --neon-cyan: #00ffff;
-    --neon-pink: #ff0080;
-    --neon-green: #00ff88;
-    --neon-purple: #a855f7;
-    --neon-orange: #ff8800;
-    --neon-blue: #0088ff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -150,7 +150,12 @@ header {
     box-shadow: var(--shadow-neon);
 }
 
-[data-theme="dark"] #theme-toggle,
+[data-theme="dark"] #theme-toggle {
+    background: linear-gradient(135deg, var(--neon-purple), var(--neon-cyan));
+    border-color: var(--accent-color);
+    animation: pulse 2s infinite;
+}
+
 @media (prefers-color-scheme: dark) {
     #theme-toggle {
         background: linear-gradient(135deg, var(--neon-purple), var(--neon-cyan));
@@ -256,7 +261,14 @@ h1 {
 }
 
 /* Cyberpunk header glow effect */
-[data-theme="dark"] h1,
+[data-theme="dark"] h1 {
+    background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 20px rgba(0,255,255,0.3);
+}
+
 @media (prefers-color-scheme: dark) {
     h1 {
         background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
@@ -301,7 +313,17 @@ h1 {
 }
 
 /* Cyberpunk tab glow effect */
-[data-theme="dark"] .tab-btn.active,
+[data-theme="dark"] .tab-btn.active {
+    box-shadow: 
+        0 0 10px rgba(0,255,255,0.3),
+        inset 0 0 20px rgba(0,255,255,0.1);
+    text-shadow: 0 0 5px var(--accent-color);
+}
+
+[data-theme="dark"] .tab-btn:hover {
+    text-shadow: 0 0 5px var(--accent-color);
+}
+
 @media (prefers-color-scheme: dark) {
     .tab-btn.active {
         box-shadow: 
@@ -309,10 +331,7 @@ h1 {
             inset 0 0 20px rgba(0,255,255,0.1);
         text-shadow: 0 0 5px var(--accent-color);
     }
-}
-
-[data-theme="dark"] .tab-btn:hover,
-@media (prefers-color-scheme: dark) {
+    
     .tab-btn:hover {
         text-shadow: 0 0 5px var(--accent-color);
     }
@@ -338,7 +357,25 @@ h1 {
 }
 
 /* Cyberpunk section glow effect */
-[data-theme="dark"] .section,
+[data-theme="dark"] .section {
+    background: linear-gradient(135deg, var(--bg-secondary), #1a1a30);
+    border: 1px solid var(--border-subtle);
+    box-shadow: 
+        0 4px 20px rgba(0,0,0,0.3),
+        inset 0 1px 0 rgba(0,255,255,0.1);
+}
+
+[data-theme="dark"] .section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+    animation: scan 3s infinite;
+}
+
 @media (prefers-color-scheme: dark) {
     .section {
         background: linear-gradient(135deg, var(--bg-secondary), #1a1a30);
@@ -374,7 +411,12 @@ h1 {
 }
 
 /* Cyberpunk heading glow */
-[data-theme="dark"] .section h2,
+[data-theme="dark"] .section h2 {
+    text-shadow: 0 0 10px var(--accent-color);
+    border-bottom: 2px solid transparent;
+    border-image: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple), var(--neon-cyan)) 1;
+}
+
 @media (prefers-color-scheme: dark) {
     .section h2 {
         text-shadow: 0 0 10px var(--accent-color);
@@ -447,7 +489,10 @@ h1 {
 }
 
 /* Cyberpunk glow effect for dark theme */
-[data-theme="dark"] .btn,
+[data-theme="dark"] .btn {
+    border: 1px solid transparent;
+}
+
 @media (prefers-color-scheme: dark) {
     .btn {
         border: 1px solid transparent;
@@ -997,22 +1042,27 @@ h1 {
 }
 
 /* Cyberpunk status badge glow */
-[data-theme="dark"] .status-badge.running,
+[data-theme="dark"] .status-badge.running {
+    box-shadow: 0 0 10px rgba(0,255,136,0.5);
+}
+
+[data-theme="dark"] .status-badge.stopped {
+    box-shadow: 0 0 10px rgba(255,0,128,0.5);
+}
+
+[data-theme="dark"] .status-badge.traefik-enabled {
+    box-shadow: 0 0 10px rgba(0,255,255,0.5);
+}
+
 @media (prefers-color-scheme: dark) {
     .status-badge.running {
         box-shadow: 0 0 10px rgba(0,255,136,0.5);
     }
-}
-
-[data-theme="dark"] .status-badge.stopped,
-@media (prefers-color-scheme: dark) {
+    
     .status-badge.stopped {
         box-shadow: 0 0 10px rgba(255,0,128,0.5);
     }
-}
-
-[data-theme="dark"] .status-badge.traefik-enabled,
-@media (prefers-color-scheme: dark) {
+    
     .status-badge.traefik-enabled {
         box-shadow: 0 0 10px rgba(0,255,255,0.5);
     }
