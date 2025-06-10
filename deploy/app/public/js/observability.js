@@ -128,7 +128,8 @@ class TraefikObservability {
             if (scanStatus) scanStatus.textContent = '🔍 Scanning domains and services...';
             if (scanButton) scanButton.disabled = true;
             
-            const domains = await TraefikUtils.apiRequest('/api/domains');
+            const response = await TraefikUtils.apiRequest('/api/domains');
+            const domains = response.domains || [];
             this.domains = domains;
             this.displayDomainOverview(domains);
             
