@@ -1,15 +1,19 @@
 # Traefik UI
 
-**Version 0.0.1**
+**Version 0.0.2**
 
 A simple web interface for managing Traefik proxy configurations without manually editing config files.
 
 ## Features
 
 - **Visual Configuration Management**: View current routes and services in a clean interface
+- **CrowdSec Integration**: Complete middleware management for CrowdSec bouncer plugin with AppSec support
+- **System Theme Support**: Automatic dark/light theme detection with manual toggle
 - **Guided Templates**: Pre-configured templates for common scenarios (HTTP, HTTPS with Let's Encrypt, internal services)
-- **Form-Based Route Creation**: Easy forms to add new proxy routes with validation
-- **TLS Configuration**: Support for Let's Encrypt and custom certificates
+- **Form-Based Route Creation**: Easy forms to add new proxy routes with middleware selection
+- **Enhanced TSIG Support**: Multiple algorithm support for RFC2136 DNS challenges
+- **Middleware Management**: Create, configure, and assign CrowdSec protection to routes
+- **TLS Configuration**: Support for Let's Encrypt production/staging and custom certificates
 - **Service Management**: Automatically create backend services when adding routes
 - **Restart Integration**: Restart Traefik directly from the UI
 
@@ -96,6 +100,28 @@ For automatic SSL certificates via DNS challenge:
      file "/etc/bind/db.example.com";
      allow-update { key "traefik-key"; };
    };
+   ```
+
+## CrowdSec Setup
+
+1. **Enable CrowdSec service in Docker Compose:**
+   ```bash
+   # Edit docker-compose.yml and uncomment the crowdsec service
+   ```
+
+2. **Configure CrowdSec:**
+   ```bash
+   # Generate a bouncer API key
+   docker exec crowdsec cscli bouncers add traefik-bouncer
+   
+   # Add the key to your .env file
+   CROWDSEC_LAPI_KEY=your-generated-key-here
+   ```
+
+3. **TSIG Algorithm Selection:**
+   ```bash
+   # Choose the appropriate algorithm for your DNS server
+   RFC2136_TSIG_ALGORITHM=hmac-sha256  # or hmac-md5, hmac-sha1, etc.
    ```
 
 ## Templates

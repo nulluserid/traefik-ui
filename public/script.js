@@ -1,11 +1,34 @@
 class TraefikUI {
     constructor() {
         this.init();
+        this.initTheme();
     }
 
     init() {
         this.setupEventListeners();
         this.loadConfig();
+        this.loadMiddleware();
+    }
+
+    initTheme() {
+        // Load saved theme or detect system preference
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'light');
+        }
+
+        // Listen for system theme changes
+        if (window.matchMedia) {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                if (!localStorage.getItem('theme')) {
+                    document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+                }
+            });
+        }
     }
 
     setupEventListeners() {
@@ -13,9 +36,12 @@ class TraefikUI {
             btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
         });
 
+        document.getElementById('theme-toggle').addEventListener('click', () => this.toggleTheme());
         document.getElementById('refresh-btn').addEventListener('click', () => this.loadConfig());
         document.getElementById('route-form').addEventListener('submit', (e) => this.handleRouteSubmit(e));
+        document.getElementById('crowdsec-form').addEventListener('submit', (e) => this.handleCrowdSecSubmit(e));
         document.getElementById('enable-tls').addEventListener('change', (e) => this.toggleTLSOptions(e.target.checked));
+        document.getElementById('enable-crowdsec').addEventListener('change', (e) => this.toggleMiddlewareOptions(e.target.checked));
         document.getElementById('restart-traefik').addEventListener('click', () => this.restartTraefik());
 
         document.querySelectorAll('.template-card').forEach(card => {
@@ -37,6 +63,35 @@ class TraefikUI {
             tlsOptions.classList.remove('hidden');
         } else {
             tlsOptions.classList.add('hidden');
+        }
+    }
+
+    toggleMiddlewareOptions(enabled) {
+        const middlewareOptions = document.getElementById('middleware-options');
+        if (enabled) {
+            middlewareOptions.classList.remove('hidden');
+            this.populateMiddlewareSelect();
+        } else {
+            middlewareOptions.classList.add('hidden');
+        }
+    }
+
+    async populateMiddlewareSelect() {
+        try {
+            const response = await fetch('/api/middleware');
+            const data = await response.json();
+            
+            const select = document.getElementById('middleware-select');
+            select.innerHTML = '';
+            
+            Object.keys(data.middlewares).forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Failed to load middleware options:', error);
         }
     }
 
@@ -109,6 +164,7 @@ class TraefikUI {
         const enableTls = document.getElementById('enable-tls').checked;
         const tlsMethod = document.getElementById('tls-method').value;
         const ignoreTlsErrors = document.getElementById('ignore-tls-errors').checked;
+        const enableCrowdSec = document.getElementById('enable-crowdsec').checked;
 
         const serviceName = `${routeName}-service`;
         
@@ -119,8 +175,18 @@ class TraefikUI {
                 name: routeName,
                 rule: `Host(\`${hostname}\`)`,
                 service: serviceName,
-                tls: enableTls ? (tlsMethod === 'letsencrypt' ? { certResolver: 'letsencrypt' } : {}) : null
+                tls: enableTls ? (tlsMethod === 'letsencrypt' ? { certResolver: 'letsencrypt' } : 
+                                tlsMethod === 'letsencrypt-staging' ? { certResolver: 'letsencrypt-staging' } : {}) : null
             };
+
+            // Add middleware if selected
+            if (enableCrowdSec) {
+                const middlewareSelect = document.getElementById('middleware-select');
+                const selectedMiddleware = Array.from(middlewareSelect.selectedOptions).map(option => option.value);
+                if (selectedMiddleware.length > 0) {
+                    routeConfig.middleware = selectedMiddleware;
+                }
+            }
 
             await this.createRoute(routeConfig);
             
@@ -250,6 +316,118 @@ class TraefikUI {
             }
             
             this.toggleTLSOptions(template.enableTls || false);
+        }
+    }
+
+    toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+    }
+
+    async loadMiddleware() {
+        try {
+            const response = await fetch('/api/middleware');
+            const data = await response.json();
+            
+            this.displayMiddleware(data.middlewares);
+        } catch (error) {
+            this.showNotification('Failed to load middleware', 'error');
+        }
+    }
+
+    displayMiddleware(middlewares) {
+        const container = document.getElementById('middleware-list');
+        
+        if (Object.keys(middlewares).length === 0) {
+            container.innerHTML = '<p>No middleware configured</p>';
+            return;
+        }
+
+        container.innerHTML = Object.entries(middlewares).map(([name, config]) => {
+            const isCrowdSec = config.plugin && config.plugin['crowdsec-bouncer-traefik-plugin'];
+            const crowdSecConfig = isCrowdSec ? config.plugin['crowdsec-bouncer-traefik-plugin'] : null;
+            
+            return `
+                <div class="middleware-item">
+                    <div class="middleware-header">
+                        <div>
+                            <span class="middleware-name">${name}</span>
+                            ${isCrowdSec ? '<span class="middleware-type">CrowdSec</span>' : ''}
+                        </div>
+                        <button class="btn btn-danger btn-sm" onclick="ui.deleteMiddleware('${name}')">Delete</button>
+                    </div>
+                    ${isCrowdSec ? `
+                        <div class="middleware-config">Mode: ${crowdSecConfig.crowdsecMode || 'stream'}</div>
+                        <div class="middleware-config">AppSec: ${crowdSecConfig.crowdsecAppsecEnabled ? 'Enabled' : 'Disabled'}</div>
+                        <div class="middleware-config">LAPI URL: ${crowdSecConfig.crowdsecLapiUrl || 'Not configured'}</div>
+                    ` : `
+                        <div class="middleware-config">Type: ${Object.keys(config)[0]}</div>
+                    `}
+                </div>
+            `;
+        }).join('');
+    }
+
+    async handleCrowdSecSubmit(e) {
+        e.preventDefault();
+        
+        const name = document.getElementById('middleware-name').value;
+        const enabled = document.getElementById('middleware-enabled').checked;
+        const mode = document.getElementById('crowdsec-mode').value;
+        const lapiUrl = document.getElementById('lapi-url').value;
+        const lapiKey = document.getElementById('lapi-key').value;
+        const appsecEnabled = document.getElementById('appsec-enabled').checked;
+        const trustedIPs = document.getElementById('trusted-ips').value
+            .split(',')
+            .map(ip => ip.trim())
+            .filter(ip => ip);
+
+        try {
+            const response = await fetch('/api/middleware/crowdsec', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name,
+                    enabled,
+                    mode,
+                    lapiUrl,
+                    lapiKey,
+                    appsecEnabled,
+                    trustedIPs
+                })
+            });
+
+            if (response.ok) {
+                this.showNotification('CrowdSec middleware created successfully!', 'success');
+                document.getElementById('crowdsec-form').reset();
+                this.loadMiddleware();
+            } else {
+                throw new Error('Failed to create middleware');
+            }
+        } catch (error) {
+            this.showNotification('Failed to create CrowdSec middleware', 'error');
+        }
+    }
+
+    async deleteMiddleware(name) {
+        if (!confirm(`Are you sure you want to delete middleware "${name}"?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/middleware/${name}`, { method: 'DELETE' });
+            
+            if (response.ok) {
+                this.showNotification('Middleware deleted successfully!', 'success');
+                this.loadMiddleware();
+            } else {
+                throw new Error('Failed to delete middleware');
+            }
+        } catch (error) {
+            this.showNotification('Failed to delete middleware', 'error');
         }
     }
 

@@ -10,12 +10,16 @@
     <div class="container">
         <header>
             <h1>Traefik Configuration Manager</h1>
-            <button id="refresh-btn" class="btn btn-secondary">Refresh Config</button>
+            <div class="header-controls">
+                <button id="theme-toggle" class="btn btn-secondary" title="Toggle theme">🌓</button>
+                <button id="refresh-btn" class="btn btn-secondary">Refresh Config</button>
+            </div>
         </header>
 
         <div class="tabs">
             <button class="tab-btn active" data-tab="overview">Overview</button>
             <button class="tab-btn" data-tab="add-route">Add Route</button>
+            <button class="tab-btn" data-tab="middleware">Middleware</button>
             <button class="tab-btn" data-tab="templates">Templates</button>
         </div>
 
@@ -75,7 +79,79 @@
                         </label>
                     </div>
                     
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="enable-crowdsec"> Enable CrowdSec Protection
+                        </label>
+                    </div>
+                    
+                    <div id="middleware-options" class="form-group hidden">
+                        <label for="middleware-select">Available Middleware:</label>
+                        <select id="middleware-select" multiple>
+                            <!-- Populated dynamically -->
+                        </select>
+                        <small>Hold Ctrl/Cmd to select multiple middleware</small>
+                    </div>
+                    
                     <button type="submit" class="btn btn-primary">Add Route</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="middleware" class="tab-content">
+            <div class="section">
+                <h2>Current Middleware</h2>
+                <div id="middleware-list" class="middleware-container">
+                    <p>Loading...</p>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Add CrowdSec Middleware</h2>
+                <form id="crowdsec-form" class="form">
+                    <div class="form-group">
+                        <label for="middleware-name">Middleware Name:</label>
+                        <input type="text" id="middleware-name" required placeholder="e.g., crowdsec-bouncer">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="middleware-enabled" checked> Enable CrowdSec Protection
+                        </label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="crowdsec-mode">CrowdSec Mode:</label>
+                        <select id="crowdsec-mode">
+                            <option value="stream">Stream (Recommended)</option>
+                            <option value="live">Live</option>
+                            <option value="alone">Alone</option>
+                            <option value="none">None</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="lapi-url">Local API URL:</label>
+                        <input type="text" id="lapi-url" placeholder="http://crowdsec:8080" value="http://crowdsec:8080">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="lapi-key">Local API Key:</label>
+                        <input type="text" id="lapi-key" required placeholder="Your CrowdSec LAPI key">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="appsec-enabled"> Enable AppSec (WAF)
+                        </label>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="trusted-ips">Trusted IPs (comma-separated):</label>
+                        <input type="text" id="trusted-ips" placeholder="10.0.0.0/8, 192.168.0.0/16">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Add CrowdSec Middleware</button>
                 </form>
             </div>
         </div>
@@ -107,6 +183,7 @@
                         <p>Internal service that ignores TLS errors</p>
                         <button class="btn btn-secondary">Use Template</button>
                     </div>
+                    
                 </div>
             </div>
         </div>

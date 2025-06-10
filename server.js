@@ -124,6 +124,82 @@ app.delete('/api/router/:name', (req, res) => {
   }
 });
 
+// CrowdSec middleware management
+app.post('/api/middleware/crowdsec', (req, res) => {
+  try {
+    const { name, enabled, mode, lapiKey, appsecEnabled, trustedIPs, lapiUrl } = req.body;
+    
+    let config = {};
+    if (fs.existsSync(DYNAMIC_CONFIG_PATH)) {
+      config = yaml.load(fs.readFileSync(DYNAMIC_CONFIG_PATH, 'utf8'));
+    }
+    
+    if (!config.http) config.http = {};
+    if (!config.http.middlewares) config.http.middlewares = {};
+    
+    if (enabled) {
+      config.http.middlewares[name] = {
+        plugin: {
+          'crowdsec-bouncer-traefik-plugin': {
+            enabled: true,
+            crowdsecMode: mode || 'stream',
+            crowdsecLapiKey: lapiKey,
+            crowdsecLapiUrl: lapiUrl || 'http://crowdsec:8080',
+            crowdsecAppsecEnabled: appsecEnabled || false,
+            clientTrustedIPs: trustedIPs || []
+          }
+        }
+      };
+    } else {
+      // Disable or remove middleware
+      if (config.http.middlewares[name]) {
+        delete config.http.middlewares[name];
+      }
+    }
+    
+    fs.writeFileSync(DYNAMIC_CONFIG_PATH, yaml.dump(config));
+    res.json({ success: true, message: 'CrowdSec middleware updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/middleware', (req, res) => {
+  try {
+    let config = {};
+    if (fs.existsSync(DYNAMIC_CONFIG_PATH)) {
+      config = yaml.load(fs.readFileSync(DYNAMIC_CONFIG_PATH, 'utf8'));
+    }
+    
+    const middlewares = config.http?.middlewares || {};
+    res.json({ middlewares });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/middleware/:name', (req, res) => {
+  try {
+    const { name } = req.params;
+    
+    if (!fs.existsSync(DYNAMIC_CONFIG_PATH)) {
+      return res.status(404).json({ error: 'Configuration file not found' });
+    }
+    
+    const config = yaml.load(fs.readFileSync(DYNAMIC_CONFIG_PATH, 'utf8'));
+    
+    if (config.http && config.http.middlewares && config.http.middlewares[name]) {
+      delete config.http.middlewares[name];
+      fs.writeFileSync(DYNAMIC_CONFIG_PATH, yaml.dump(config));
+      res.json({ success: true, message: 'Middleware deleted successfully' });
+    } else {
+      res.status(404).json({ error: 'Middleware not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Traefik UI running on http://localhost:${PORT}`);
 });

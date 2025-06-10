@@ -4,11 +4,97 @@
     box-sizing: border-box;
 }
 
+:root {
+    /* Light theme (default) */
+    --bg-primary: #f5f5f5;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f8f9fa;
+    --text-primary: #333333;
+    --text-secondary: #555555;
+    --text-tertiary: #666666;
+    --border-color: #e0e0e0;
+    --border-subtle: #ddd;
+    --accent-color: #007bff;
+    --accent-hover: #0056b3;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --warning-text: #212529;
+    --danger-color: #dc3545;
+    --danger-hover: #c82333;
+    --shadow: rgba(0,0,0,0.1);
+    --shadow-hover: rgba(0,0,0,0.15);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        /* Dark theme */
+        --bg-primary: #1a1a1a;
+        --bg-secondary: #2d2d2d;
+        --bg-tertiary: #404040;
+        --text-primary: #ffffff;
+        --text-secondary: #e0e0e0;
+        --text-tertiary: #cccccc;
+        --border-color: #404040;
+        --border-subtle: #555555;
+        --accent-color: #4dabf7;
+        --accent-hover: #339af0;
+        --success-color: #51cf66;
+        --warning-color: #ffd43b;
+        --warning-text: #1a1a1a;
+        --danger-color: #ff6b6b;
+        --danger-hover: #fa5252;
+        --shadow: rgba(0,0,0,0.3);
+        --shadow-hover: rgba(0,0,0,0.4);
+    }
+}
+
+/* Manual theme overrides */
+[data-theme="light"] {
+    --bg-primary: #f5f5f5;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f8f9fa;
+    --text-primary: #333333;
+    --text-secondary: #555555;
+    --text-tertiary: #666666;
+    --border-color: #e0e0e0;
+    --border-subtle: #ddd;
+    --accent-color: #007bff;
+    --accent-hover: #0056b3;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --warning-text: #212529;
+    --danger-color: #dc3545;
+    --danger-hover: #c82333;
+    --shadow: rgba(0,0,0,0.1);
+    --shadow-hover: rgba(0,0,0,0.15);
+}
+
+[data-theme="dark"] {
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2d2d2d;
+    --bg-tertiary: #404040;
+    --text-primary: #ffffff;
+    --text-secondary: #e0e0e0;
+    --text-tertiary: #cccccc;
+    --border-color: #404040;
+    --border-subtle: #555555;
+    --accent-color: #4dabf7;
+    --accent-hover: #339af0;
+    --success-color: #51cf66;
+    --warning-color: #ffd43b;
+    --warning-text: #1a1a1a;
+    --danger-color: #ff6b6b;
+    --danger-hover: #fa5252;
+    --shadow: rgba(0,0,0,0.3);
+    --shadow-hover: rgba(0,0,0,0.4);
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #f5f5f5;
-    color: #333;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
     line-height: 1.6;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .container {
@@ -23,18 +109,64 @@ header {
     align-items: center;
     margin-bottom: 30px;
     padding-bottom: 20px;
-    border-bottom: 2px solid #e0e0e0;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.header-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.middleware-container {
+    display: grid;
+    gap: 15px;
+}
+
+.middleware-item {
+    background: var(--bg-tertiary);
+    padding: 20px;
+    border-radius: 6px;
+    border-left: 4px solid var(--success-color);
+}
+
+.middleware-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.middleware-name {
+    font-weight: bold;
+    font-size: 18px;
+    color: var(--text-primary);
+}
+
+.middleware-type {
+    font-size: 12px;
+    background: var(--accent-color);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-left: 10px;
+}
+
+.middleware-config {
+    color: var(--text-tertiary);
+    font-size: 14px;
+    margin-bottom: 8px;
 }
 
 h1 {
-    color: #2c3e50;
+    color: var(--text-primary);
     font-size: 2rem;
 }
 
 .tabs {
     display: flex;
     margin-bottom: 30px;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 .tab-btn {
@@ -43,17 +175,18 @@ h1 {
     padding: 12px 24px;
     cursor: pointer;
     font-size: 16px;
+    color: var(--text-primary);
     border-bottom: 3px solid transparent;
     transition: all 0.3s ease;
 }
 
 .tab-btn:hover {
-    background-color: #f8f9fa;
+    background-color: var(--bg-tertiary);
 }
 
 .tab-btn.active {
-    color: #007bff;
-    border-bottom-color: #007bff;
+    color: var(--accent-color);
+    border-bottom-color: var(--accent-color);
 }
 
 .tab-content {
@@ -65,17 +198,17 @@ h1 {
 }
 
 .section {
-    background: white;
+    background: var(--bg-secondary);
     padding: 25px;
     margin-bottom: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px var(--shadow);
 }
 
 .section h2 {
     margin-bottom: 20px;
-    color: #2c3e50;
-    border-bottom: 2px solid #3498db;
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--accent-color);
     padding-bottom: 10px;
 }
 
@@ -91,24 +224,26 @@ h1 {
     display: block;
     margin-bottom: 8px;
     font-weight: 500;
-    color: #555;
+    color: var(--text-secondary);
 }
 
 .form-group input[type="text"],
 .form-group select {
     width: 100%;
     padding: 12px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-subtle);
     border-radius: 4px;
     font-size: 16px;
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
     transition: border-color 0.3s ease;
 }
 
 .form-group input[type="text"]:focus,
 .form-group select:focus {
     outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(74, 171, 247, 0.25);
 }
 
 .form-group input[type="checkbox"] {
@@ -127,39 +262,40 @@ h1 {
 }
 
 .btn-primary {
-    background-color: #007bff;
+    background-color: var(--accent-color);
     color: white;
 }
 
 .btn-primary:hover {
-    background-color: #0056b3;
+    background-color: var(--accent-hover);
 }
 
 .btn-secondary {
-    background-color: #6c757d;
+    background-color: var(--text-secondary);
     color: white;
 }
 
 .btn-secondary:hover {
-    background-color: #545b62;
+    background-color: var(--text-tertiary);
 }
 
 .btn-warning {
-    background-color: #ffc107;
-    color: #212529;
+    background-color: var(--warning-color);
+    color: var(--warning-text);
 }
 
 .btn-warning:hover {
-    background-color: #e0a800;
+    background-color: var(--warning-color);
+    opacity: 0.9;
 }
 
 .btn-danger {
-    background-color: #dc3545;
+    background-color: var(--danger-color);
     color: white;
 }
 
 .btn-danger:hover {
-    background-color: #c82333;
+    background-color: var(--danger-hover);
 }
 
 .routes-container,
@@ -170,10 +306,10 @@ h1 {
 
 .route-item,
 .service-item {
-    background: #f8f9fa;
+    background: var(--bg-tertiary);
     padding: 20px;
     border-radius: 6px;
-    border-left: 4px solid #007bff;
+    border-left: 4px solid var(--accent-color);
 }
 
 .route-header,
@@ -188,18 +324,18 @@ h1 {
 .service-name {
     font-weight: bold;
     font-size: 18px;
-    color: #2c3e50;
+    color: var(--text-primary);
 }
 
 .route-rule,
 .service-url {
-    color: #666;
+    color: var(--text-tertiary);
     margin-bottom: 8px;
 }
 
 .route-tls {
     display: inline-block;
-    background: #28a745;
+    background: var(--success-color);
     color: white;
     padding: 4px 8px;
     border-radius: 4px;
@@ -214,27 +350,27 @@ h1 {
 }
 
 .template-card {
-    background: #f8f9fa;
+    background: var(--bg-tertiary);
     padding: 25px;
     border-radius: 8px;
-    border: 1px solid #e9ecef;
+    border: 1px solid var(--border-color);
     text-align: center;
     transition: transform 0.2s ease;
 }
 
 .template-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 12px var(--shadow-hover);
 }
 
 .template-card h3 {
     margin-bottom: 10px;
-    color: #2c3e50;
+    color: var(--text-primary);
 }
 
 .template-card p {
     margin-bottom: 20px;
-    color: #666;
+    color: var(--text-tertiary);
 }
 
 .actions {
@@ -255,11 +391,11 @@ h1 {
 }
 
 .notification.success {
-    background-color: #28a745;
+    background-color: var(--success-color);
 }
 
 .notification.error {
-    background-color: #dc3545;
+    background-color: var(--danger-color);
 }
 
 .notification.hidden {
