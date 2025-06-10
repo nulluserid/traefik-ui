@@ -453,6 +453,10 @@ h1 {
     background-color: var(--danger-color);
 }
 
+.notification.info {
+    background-color: var(--accent-color);
+}
+
 .notification.hidden {
     opacity: 0;
     transform: translateX(100%);
@@ -460,6 +464,120 @@ h1 {
 
 .hidden {
     display: none !important;
+}
+
+/* DNS Providers Styles */
+.dns-providers-container {
+    display: grid;
+    gap: 15px;
+}
+
+.dns-provider-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    transition: all 0.2s ease;
+}
+
+.dns-provider-card:hover {
+    box-shadow: 0 2px 8px var(--shadow-hover);
+}
+
+.dns-provider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.dns-provider-name {
+    font-size: 1.2em;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.dns-provider-type {
+    background: var(--accent-color);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+}
+
+.dns-provider-details {
+    color: var(--text-secondary);
+    margin-bottom: 15px;
+}
+
+.dns-provider-details .detail-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+}
+
+.dns-provider-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.provider-config {
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 20px;
+    margin-top: 15px;
+    background: var(--bg-tertiary);
+}
+
+.dns-provider-examples {
+    margin-top: 25px;
+    padding: 20px;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    border: 1px solid var(--border-subtle);
+}
+
+.example-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.example-card {
+    background: var(--bg-secondary);
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.example-card h5 {
+    color: var(--accent-color);
+    margin-bottom: 8px;
+    font-size: 1em;
+}
+
+.example-card p {
+    font-size: 0.9em;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.dns-provider-help {
+    margin-top: 8px;
+}
+
+.dns-provider-help small {
+    color: var(--text-tertiary);
+}
+
+.dns-provider-help a {
+    color: var(--accent-color);
+    text-decoration: none;
+}
+
+.dns-provider-help a:hover {
+    text-decoration: underline;
 }
 
 @media (max-width: 768px) {

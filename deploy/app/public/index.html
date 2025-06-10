@@ -20,6 +20,7 @@
             <button class="tab-btn active" data-tab="overview">Overview</button>
             <button class="tab-btn" data-tab="add-route">Add Route</button>
             <button class="tab-btn" data-tab="middleware">Middleware</button>
+            <button class="tab-btn" data-tab="dns-providers">DNS Providers</button>
             <button class="tab-btn" data-tab="templates">Templates</button>
         </div>
 
@@ -67,10 +68,23 @@
                     <div id="tls-options" class="form-group hidden">
                         <label for="tls-method">TLS Method:</label>
                         <select id="tls-method">
-                            <option value="letsencrypt">Let's Encrypt (Production)</option>
-                            <option value="letsencrypt-staging">Let's Encrypt (Staging)</option>
+                            <option value="letsencrypt-http">Let's Encrypt (HTTP Challenge)</option>
+                            <option value="letsencrypt-dns">Let's Encrypt (DNS Challenge)</option>
+                            <option value="letsencrypt-staging-http">Let's Encrypt Staging (HTTP Challenge)</option>
+                            <option value="letsencrypt-staging-dns">Let's Encrypt Staging (DNS Challenge)</option>
                             <option value="custom">Custom Certificate</option>
                         </select>
+                    </div>
+                    
+                    <div id="dns-provider-options" class="form-group hidden">
+                        <label for="dns-provider">DNS Provider:</label>
+                        <select id="dns-provider">
+                            <option value="">Select DNS Provider...</option>
+                            <!-- Populated dynamically from saved providers -->
+                        </select>
+                        <div class="dns-provider-help">
+                            <small>💡 <a href="#" onclick="switchTab('dns-providers')">Manage DNS Providers</a> to add RFC2136/TSIG configurations</small>
+                        </div>
                     </div>
                     
                     <div id="custom-cert-options" class="form-group hidden">
@@ -183,6 +197,116 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...
                     </div>
                     
                     <button type="submit" class="btn btn-primary">Add CrowdSec Middleware</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="dns-providers" class="tab-content">
+            <div class="section">
+                <h2>DNS Providers</h2>
+                <div id="dns-providers-list" class="dns-providers-container">
+                    <p>Loading DNS providers...</p>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Add DNS Provider</h2>
+                <form id="dns-provider-form" class="form">
+                    <div class="form-group">
+                        <label for="provider-name">Provider Name:</label>
+                        <input type="text" id="provider-name" required placeholder="e.g., primary-dns, staging-dns">
+                        <small>A friendly name to identify this DNS provider configuration</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="provider-type">Provider Type:</label>
+                        <select id="provider-type">
+                            <option value="rfc2136">RFC2136 (Dynamic DNS Updates)</option>
+                        </select>
+                        <small>Currently supports RFC2136 for BIND, PowerDNS, Windows DNS, etc.</small>
+                    </div>
+                    
+                    <div id="rfc2136-config" class="provider-config">
+                        <div class="form-group">
+                            <label for="nameserver">DNS Server:</label>
+                            <input type="text" id="nameserver" required placeholder="ns1.example.com:53 or 192.168.1.10:53">
+                            <small>DNS server hostname/IP and port that accepts dynamic updates</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="tsig-key">TSIG Key Name:</label>
+                            <input type="text" id="tsig-key" required placeholder="traefik-key">
+                            <small>The name of your TSIG key configured on the DNS server</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="tsig-secret">TSIG Secret:</label>
+                            <input type="password" id="tsig-secret" required placeholder="base64-encoded-secret">
+                            <small>Base64 encoded shared secret for TSIG authentication</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="tsig-algorithm">TSIG Algorithm:</label>
+                            <select id="tsig-algorithm">
+                                <option value="hmac-sha256">HMAC-SHA256 (Recommended)</option>
+                                <option value="hmac-sha512">HMAC-SHA512</option>
+                                <option value="hmac-sha384">HMAC-SHA384</option>
+                                <option value="hmac-sha224">HMAC-SHA224</option>
+                                <option value="hmac-sha1">HMAC-SHA1</option>
+                                <option value="hmac-md5">HMAC-MD5</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="dns-timeout">DNS Timeout:</label>
+                            <input type="text" id="dns-timeout" value="60s" placeholder="60s">
+                            <small>Timeout for DNS operations</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="propagation-timeout">Propagation Timeout:</label>
+                            <input type="text" id="propagation-timeout" value="120s" placeholder="120s">
+                            <small>Time to wait for DNS changes to propagate</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="polling-interval">Polling Interval:</label>
+                            <input type="text" id="polling-interval" value="16s" placeholder="16s">
+                            <small>How often to check if DNS challenge is complete</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="dns-ttl">DNS TTL:</label>
+                            <input type="number" id="dns-ttl" value="120" placeholder="120">
+                            <small>TTL for DNS challenge records</small>
+                        </div>
+                    </div>
+                    
+                    <div class="dns-provider-examples">
+                        <h4>Configuration Examples:</h4>
+                        <div class="example-grid">
+                            <div class="example-card">
+                                <h5>BIND9</h5>
+                                <p><strong>Server:</strong> 192.168.1.10:53<br>
+                                <strong>Key:</strong> traefik-key<br>
+                                <strong>Algorithm:</strong> hmac-sha256</p>
+                            </div>
+                            <div class="example-card">
+                                <h5>PowerDNS</h5>
+                                <p><strong>Server:</strong> powerdns.local:53<br>
+                                <strong>Key:</strong> powerdns-key<br>
+                                <strong>Algorithm:</strong> hmac-sha256</p>
+                            </div>
+                            <div class="example-card">
+                                <h5>Windows DNS</h5>
+                                <p><strong>Server:</strong> dc1.domain.local:53<br>
+                                <strong>Key:</strong> dhcp-dns-key<br>
+                                <strong>Algorithm:</strong> hmac-md5</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Add DNS Provider</button>
                 </form>
             </div>
         </div>
