@@ -1,0 +1,13 @@
+version: '3.8'
+
+# This creates the shared external network that multiple stacks can connect to
+networks:
+  shared-network:
+    driver: bridge
+    name: shared-network
+    driver_opts:
+      com.docker.network.bridge.name: shared-br0
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1

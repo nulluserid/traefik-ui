@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  legacy-web:
+    image: traefik/whoami
+    container_name: legacy-web
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.legacy-web.rule=Host(`legacy.local`)"
+      - "traefik.http.routers.legacy-web.entrypoints=web"
+      - "traefik.http.services.legacy-web.loadbalancer.server.port=80"
+    networks:
+      - legacy-network
+
+  legacy-database:
+    image: traefik/whoami
+    container_name: legacy-database
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=false"
+    networks:
+      - legacy-network
+      - isolated-network
+
+  legacy-cache:
+    image: traefik/whoami
+    container_name: legacy-cache
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=false"
+    networks:
+      - legacy-network
+
+networks:
+  legacy-network:
+    driver: bridge
+    name: legacy-network
+  isolated-network:
+    driver: bridge
+    name: isolated-network
+    internal: true

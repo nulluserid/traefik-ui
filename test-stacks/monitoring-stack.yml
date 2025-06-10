@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  prometheus:
+    image: traefik/whoami
+    container_name: prometheus
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.monitoring.local`)"
+      - "traefik.http.routers.prometheus.entrypoints=web"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=80"
+      - "traefik.http.routers.prometheus.middlewares=auth-middleware"
+    networks:
+      - monitoring-network
+      - backend-network
+
+  grafana:
+    image: traefik/whoami
+    container_name: grafana
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.monitoring.local`)"
+      - "traefik.http.routers.grafana.entrypoints=web"
+      - "traefik.http.services.grafana.loadbalancer.server.port=80"
+    networks:
+      - monitoring-network
+
+  alertmanager:
+    image: traefik/whoami
+    container_name: alertmanager
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.alertmanager.rule=Host(`alerts.monitoring.local`)"
+      - "traefik.http.routers.alertmanager.entrypoints=web"
+      - "traefik.http.services.alertmanager.loadbalancer.server.port=80"
+    networks:
+      - monitoring-network
+
+  node-exporter:
+    image: traefik/whoami
+    container_name: node-exporter
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=false"
+    networks:
+      - monitoring-network
+
+networks:
+  monitoring-network:
+    driver: bridge
+    name: monitoring-network
+  backend-network:
+    external: true
+    name: backend-network
