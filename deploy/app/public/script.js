@@ -139,6 +139,11 @@ class TraefikUI {
         
         document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
         document.getElementById(tabName).classList.add('active');
+        
+        // Initialize system config tab when accessed
+        if (tabName === 'system-config') {
+            this.loadSystemConfigStatus();
+        }
     }
 
     toggleTLSOptions(enabled) {
@@ -2587,11 +2592,29 @@ scrape_timeout: 10s`;
             });
             
             const validation = await validateResponse.json();
-            this.displayValidationResults(validation);
             
-            document.getElementById('validation-status').textContent = validation.valid ? 'Valid' : 'Invalid';
-            document.getElementById('validation-status').className = `status-indicator ${validation.valid ? 'success' : 'error'}`;
+            // Update validation status indicator
+            const statusElement = document.getElementById('validation-status');
+            if (statusElement) {
+                statusElement.textContent = validation.valid ? 'Valid' : 'Invalid';
+                statusElement.className = `status-indicator ${validation.valid ? 'success' : 'error'}`;
+            }
+            
+            // Show validation results if available, otherwise show notification
+            const resultsDiv = document.getElementById('validation-results');
+            if (resultsDiv) {
+                this.displayValidationResults(validation);
+            } else {
+                // If no results div, show notification instead
+                if (validation.valid) {
+                    this.showNotification('✅ Configuration is valid with no issues', 'success');
+                } else {
+                    const errorMsg = validation.errors?.join(', ') || 'Configuration validation failed';
+                    this.showNotification(`❌ Configuration errors: ${errorMsg}`, 'error');
+                }
+            }
         } catch (error) {
+            console.error('Validation error:', error);
             this.showNotification('Failed to validate configuration', 'error');
         }
     }
@@ -2674,22 +2697,31 @@ scrape_timeout: 10s`;
         const errorsDiv = document.getElementById('validation-errors');
         const warningsDiv = document.getElementById('validation-warnings');
         
+        if (!resultsDiv) {
+            console.warn('Validation results div not found');
+            return;
+        }
+        
         resultsDiv.classList.remove('hidden');
         
         if (validation.errors && validation.errors.length > 0) {
-            errorsDiv.innerHTML = '<h5>Errors:</h5><ul>' + 
-                validation.errors.map(error => `<li class="error">${error}</li>`).join('') + 
-                '</ul>';
+            if (errorsDiv) {
+                errorsDiv.innerHTML = '<h5>Errors:</h5><ul>' + 
+                    validation.errors.map(error => `<li class="error">${error}</li>`).join('') + 
+                    '</ul>';
+            }
         } else {
-            errorsDiv.innerHTML = '';
+            if (errorsDiv) errorsDiv.innerHTML = '';
         }
         
         if (validation.warnings && validation.warnings.length > 0) {
-            warningsDiv.innerHTML = '<h5>Warnings:</h5><ul>' + 
-                validation.warnings.map(warning => `<li class="warning">${warning}</li>`).join('') + 
-                '</ul>';
+            if (warningsDiv) {
+                warningsDiv.innerHTML = '<h5>Warnings:</h5><ul>' + 
+                    validation.warnings.map(warning => `<li class="warning">${warning}</li>`).join('') + 
+                    '</ul>';
+            }
         } else {
-            warningsDiv.innerHTML = '';
+            if (warningsDiv) warningsDiv.innerHTML = '';
         }
         
         if (!validation.errors?.length && !validation.warnings?.length) {
