@@ -2,9 +2,11 @@
 
 This file provides comprehensive guidance to Claude Code (claude.ai/code) when working with the Traefik UI project.
 
+**IMPORTANT NOTE:** All development and testing is done on the remote server at root@10.0.1.125 under /opt/traefik-ui/. Local development server is NOT used. Always deploy changes to the remote server for testing via git pull.
+
 ## Project Overview
-**Version:** 0.0.5  
-**Type:** Web-based configuration management interface for Traefik reverse proxy  
+**Version:** 0.0.6  
+**Type:** Enterprise-grade web interface for Traefik reverse proxy with network topology visualization and observability management  
 **Tech Stack:** Node.js (Express), Vanilla JavaScript, CSS3, Docker, dockerode  
 
 ### Core Purpose
@@ -116,9 +118,10 @@ This project has both a standalone version (root directory) and a complete deplo
 - LocalStorage persistence for user preference
 - **Reduced glow effects for better text readability** (UPDATED in v0.0.5)
 
-**Grouped Navigation Interface** (NEW in v0.0.5):
+**Grouped Navigation Interface** (ENHANCED in v0.0.6):
 **📊 Monitoring Group:**
 - Overview: Current routes/services display with health status
+- **Domain Overview: Comprehensive health dashboard with topology mapping** (NEW in v0.0.6)
 - **Service Discovery: Docker container scanning and management** (NEW in v0.0.5)
 - **Network Management: Multi-stack network connectivity** (NEW in v0.0.5)
 
@@ -126,10 +129,12 @@ This project has both a standalone version (root directory) and a complete deplo
 - Add Route: Form-based route creation with **intelligent network validation** (NEW in v0.0.5)
 - Middleware: CrowdSec configuration management
 - DNS Providers: TSIG/RFC2136 configuration management
+- **Observability: Complete logging, metrics, and tracing management with presets** (NEW in v0.0.6)
 
 **🛠️ Tools Group:**
 - Label Generator: Docker label generation for GitOps
 - Templates: Quick-start templates for common scenarios
+- **System Config: Backup, restore, import/export with version migration** (NEW in v0.0.6)
 
 ### TLS and Certificate Management
 **Three-Tier TLS System**:
@@ -187,7 +192,7 @@ This project has both a standalone version (root directory) and a complete deplo
 ## Development Notes
 
 ### Version Strategy
-- Current version 0.0.3 with comprehensive DNS provider management
+- Current version 0.0.6 with comprehensive observability and network management
 - Deployment-focused architecture ready for Docker Hub publishing
 - Maintains backward compatibility with standalone deployment
 
@@ -249,13 +254,16 @@ traefik_ui:
 1. **Visual Configuration Management** - Web interface for routes/services with intelligent validation
 2. **Docker Service Discovery** - Scan and manage containers with Traefik labels (NEW in v0.0.5)
 3. **Network Management** - Connect Traefik to external docker-compose networks (NEW in v0.0.5)
-4. **DNS Provider Management** - RFC2136/TSIG configurations with reusable settings
-5. **CrowdSec Integration** - Complete middleware management with AppSec support
-6. **TLS Management** - Let's Encrypt (HTTP/DNS) + custom certificate support
-7. **Enhanced Cyberpunk Theme** - Improved contrast and readability (UPDATED in v0.0.5)
-8. **Organized Navigation** - Grouped menu system with logical organization (NEW in v0.0.5)
-9. **Docker Label Generator** - Generate Traefik labels for docker-compose services
-10. **Template System** - Quick-start templates for common scenarios
+4. **Domain Overview & Health Dashboard** - Comprehensive domain analysis with topology mapping (NEW in v0.0.6)
+5. **Observability Configuration** - Complete logging, metrics, and tracing management with presets (NEW in v0.0.6)
+6. **DNS Provider Management** - RFC2136/TSIG configurations with reusable settings
+7. **CrowdSec Integration** - Complete middleware management with AppSec support
+8. **TLS Management** - Let's Encrypt (HTTP/DNS) + custom certificate support
+9. **Configuration Management System** - Backup, restore, import/export with version migration (NEW in v0.0.6)
+10. **Enhanced Cyberpunk Theme** - Improved contrast and readability (UPDATED in v0.0.5)
+11. **Organized Navigation** - Grouped menu system with logical organization (NEW in v0.0.5)
+12. **Docker Label Generator** - Generate Traefik labels for docker-compose services
+13. **Template System** - Quick-start templates for common scenarios
 
 ### ⚠️ Known Issues (v0.0.5)
 1. **Network Attachability Bug** - Networks showing "not attachable" when they should be connectable
@@ -326,17 +334,17 @@ Complete network management system enabling multi-stack Docker deployments:
 - Smart route validation with automatic network connectivity offers
 - Real-time network status monitoring and filtering
 
-### Phase 4: Network Map & Observability Dashboard (NEXT - PRIORITY)
+### Phase 4: Network Map & Observability Dashboard ✅ COMPLETED
 **Goal:** Comprehensive network topology view with observability integration
 
-**Implementation Plan:**
-1. **Visual Network Map**
+**Implementation Results:**
+1. **Visual Network Map** ✅
    - Interactive network topology showing domain → service → container → external host flow
    - Visual representation of routing paths and network connections
    - Real-time status indicators for each component in the chain
    - Domain-centric view with expandable service details
 
-2. **Service Configuration Display**
+2. **Service Configuration Display** ✅
    For each domain, show:
    - **TLS Configuration**: Let's Encrypt (HTTP/DNS), Custom Certificate, or None
    - **DNS Provider**: Which RFC2136 provider is used (if DNS challenge)
@@ -391,41 +399,145 @@ Complete network management system enabling multi-stack Docker deployments:
 └── ⚡ Status: 150ms response, 3 errors today
 ```
 
-This overview dashboard will provide operations teams with a single pane of glass for understanding the complete routing topology and identifying potential issues before they become problems.
+This overview dashboard provides operations teams with a single pane of glass for understanding the complete routing topology and identifying potential issues before they become problems.
 
-### Phase 5: Observability & Logging Configuration (PRIORITY)
+### 🎉 Major Achievements in v0.0.6
+
+#### Phase 4: Network Map & Observability Dashboard ✅ COMPLETED
+**Revolutionary domain analysis and network topology visualization:**
+- **Domain Overview Dashboard**: Comprehensive health analysis with real-time status indicators
+- **Interactive Network Topology**: Visual mapping of domain → service → container → network paths  
+- **Advanced Health Monitoring**: Container inspection, network connectivity analysis, and backend validation
+- **OpenTelemetry Integration**: Mock trace data ready for Jaeger/Zipkin backends
+- **Multi-tab Domain Details**: Complete configuration analysis with observability data
+- **Conflict Detection**: Automatic identification of routing conflicts and orphaned services
+
+#### Phase 5: Observability & Logging Configuration ✅ COMPLETED  
+**Enterprise-grade observability management with preset system:**
+- **Preset Management**: Production, Development, Minimal, and Custom configuration modes
+- **Access Logs**: JSON/CLF formatting with Graylog integration support
+- **Prometheus Metrics**: Configurable endpoints with category selection and sample configs
+- **OpenTelemetry Tracing**: Support for Jaeger, Zipkin, and OTLP backends with sampling control
+- **One-Click Application**: Automatic preset deployment with real-time form updates
+- **Configuration Testing**: Built-in testing tools for all observability endpoints
+- **Enhanced UI**: Status indicators, conditional sections, and responsive design
+
+#### Phase 5.5: Configuration Management System ✅ COMPLETED
+**Comprehensive backup, migration, and configuration management:**
+- **Version Migration**: Automatic schema migration from v0.0.5 to v0.0.6
+- **Backup & Restore**: Manual and automatic backups with metadata tracking  
+- **Import/Export**: Configuration portability with validation
+- **UI Configuration**: Centralized management of presets, templates, and settings
+- **Validation System**: Real-time configuration validation with detailed error reporting
+
+## Development Roadmap
+
+### Phase 1: Label Generator ✅ COMPLETED
+- [x] Docker label generation from form inputs
+- [x] Template system for common scenarios  
+- [x] Copy-to-clipboard functionality
+- [x] Integration with existing DNS/middleware systems
+
+### Phase 2: Service Discovery ✅ COMPLETED  
+- [x] Docker daemon integration via dockerode
+- [x] Container scanning for existing Traefik labels
+- [x] Service management interface with filtering
+- [x] Network discovery and display
+- [x] Label parsing and validation
+- [x] Real-time service status monitoring
+
+### Phase 3: Network Management ✅ COMPLETED
+- [x] External network discovery and scanning
+- [x] Traefik network connection management (connect/disconnect)
+- [x] Cross-stack service integration
+- [x] Visual network topology with connection status
+- [x] Network health checks and connectivity testing
+- [x] Intelligent route validation with network connectivity checks
+- [x] Smart modal dialogs for automatic network connection
+
+**Technical Achievements:**
+- Complete Docker API integration using dockerode
+- Network connect/disconnect API endpoints (`/api/networks/:id/connect`, `/api/networks/:id/disconnect`)
+- Network topology visualization (`/api/networks/topology`)
+- Smart route validation with automatic network connectivity offers
+- Real-time network status monitoring and filtering
+
+### Phase 4: Network Map & Observability Dashboard ✅ COMPLETED
+**Goal:** Comprehensive network topology view with observability integration
+
+**Implementation Results:**
+1. **Visual Network Map** ✅
+   - Interactive network topology showing domain → service → container → external host flow
+   - Visual representation of routing paths and network connections
+   - Real-time status indicators for each component in the chain
+   - Domain-centric view with expandable service details
+
+2. **Service Configuration Display** ✅
+   For each domain, show:
+   - **TLS Configuration**: Let's Encrypt (HTTP/DNS), Custom Certificate, or None
+   - **DNS Provider**: Which RFC2136 provider is used (if DNS challenge)
+   - **Certificate Details**: Expiration dates, issuer, renewal status
+   - **Middleware Chain**: CrowdSec, rate limiting, auth, custom middleware
+   - **Backend Routing**: Target destination and configuration
+
+3. **Backend Target Analysis** ✅
+   - **Docker Services**: Stack name, container name, internal port, network path
+   - **External Services**: IP address/hostname, port, protocol
+   - **Load Balancing**: Multiple backends, health checks, failover config
+   - **Network Traversal**: Visual path through Docker networks
+
+4. **OpenTelemetry Integration** ✅
+   - Mock implementation ready for Jaeger/Zipkin integration
+   - Display request traces and performance metrics structure
+   - Service dependency mapping framework
+   - Real-time latency and error rate monitoring architecture
+
+5. **Domain Health & Observability** ✅
+   - **Accessibility**: HTTP status codes, response times
+   - **Certificate Status**: Valid, expiring soon, expired, invalid detection
+   - **Backend Health**: Container status, external service reachability
+   - **Traffic Metrics**: Request counts, error rates, latency percentiles
+   - **Conflict Detection**: Automatic identification of routing conflicts
+
+### Phase 5: Observability & Logging Configuration ✅ COMPLETED
 **Goal:** Configure and manage Traefik observability features through the UI
 
-**Implementation Plan:**
-1. **Access Logs Configuration**
+**Implementation Results:**
+1. **Access Logs Configuration** ✅
    - UI to configure external Graylog integration (configurable endpoint/format)
    - Log format selection (JSON, CLF, custom)
    - Log filtering and sampling configuration
    - Real-time log stream preview
 
-2. **Prometheus Metrics Setup**
+2. **Prometheus Metrics Setup** ✅
    - Enable/disable Prometheus metrics endpoint
    - Configure metrics collection intervals
    - Info page showing scrape endpoint and configuration
    - Sample Prometheus configuration snippets
 
-3. **OpenTelemetry Tracing**
+3. **OpenTelemetry Tracing** ✅
    - Configure tracing backends (Jaeger, Zipkin, OTLP)
    - Sampling rate configuration
    - Service name and tag management
    - Trace export format selection
 
-4. **Logging & Metrics UI**
-   - New "Observability" tab with configuration sections
-   - Test connections to external systems
-   - Configuration validation and preview
-   - Export configuration for manual setup
+4. **Preset Management System** ✅ (NEW FEATURE)
+   - **Production Preset**: JSON logs + full metrics + Jaeger tracing (10% sampling)
+   - **Development Preset**: CLF logs + basic metrics + no tracing
+   - **Minimal Preset**: All observability disabled for minimal overhead
+   - **Custom Mode**: Manual configuration using detailed forms
+
+5. **Enhanced Observability UI** ✅
+   - One-click preset application with automatic form updates
+   - Real-time status indicators for all observability components
+   - Comprehensive testing tools for each configuration type
+   - Parallel configuration application for better performance
 
 **Technical Implementation:**
-- Modify Traefik static configuration (traefik.yml)
-- API endpoints for observability configuration
-- Configuration validation and testing
-- Integration with existing restart mechanism
+- Modified Traefik static configuration (traefik.yml) management
+- Complete API endpoints for observability configuration
+- Configuration validation and testing infrastructure
+- Integration with existing restart mechanism and UI configuration system
 
 ### Phase 6: Remote Proxy Configuration (PRIORITY)
 **Goal:** Optimize Traefik for remote proxy scenarios with proper IP handling
@@ -506,36 +618,46 @@ entryPoints:
 - `POST /api/certificate` - Upload custom certificate
 - `DELETE /api/certificate/:hostname` - Remove certificate
 
-### Planned Endpoints (Service Discovery - Phase 2)
+### Implemented Endpoints (Service Discovery - Phase 2) ✅
 - `GET /api/docker/services` - List all containers with Traefik labels
 - `GET /api/docker/networks` - List Docker networks and Traefik connectivity
 - `PUT /api/docker/labels/:containerId` - Update container labels
-- `POST /api/docker/network/:service` - Add service to Traefik network
-- `GET /api/docker/status/:service` - Get service health and status
+- `GET /api/docker/status/:containerId` - Get service health and status
 
-### Planned Endpoints (Network Management - Phase 3)
-- `GET /api/docker/networks/external` - List external Docker networks available for connection
-- `POST /api/docker/networks/:networkId/connect` - Connect Traefik to external network
-- `DELETE /api/docker/networks/:networkId/disconnect` - Disconnect Traefik from network
-- `GET /api/docker/networks/:networkId/test` - Test network connectivity and health
-- `GET /api/traefik/networks` - List networks Traefik is currently connected to
+### Implemented Endpoints (Network Management - Phase 3) ✅
+- `GET /api/networks/management` - Get network information with Traefik connection status
+- `POST /api/networks/:networkId/connect` - Connect Traefik to external network
+- `POST /api/networks/:networkId/disconnect` - Disconnect Traefik from network
+- `GET /api/networks/topology` - Get detailed network topology
 
-### Planned Endpoints (Network Map & Observability - Phase 4)
+### Implemented Endpoints (Network Map & Observability - Phase 4) ✅
 - `GET /api/domains` - List all domains with aggregated configuration
 - `GET /api/domains/:domain` - Get complete configuration for specific domain
 - `GET /api/domains/:domain/health` - Get health status and metrics for domain
 - `GET /api/domains/:domain/traces` - Get OpenTelemetry traces for domain
 - `GET /api/domains/conflicts` - Identify routing conflicts and configuration issues
 - `POST /api/domains/:domain/test` - Test domain accessibility and backend health
-- `GET /api/topology` - Get complete network topology map data
+- `GET /api/domains/topology` - Get complete network topology map data
+- `GET /api/domains/metrics` - Get performance metrics for all domains
 
-### Planned Endpoints (Observability Configuration - Phase 5)
+### Implemented Endpoints (Observability Configuration - Phase 5) ✅
 - `GET /api/observability/config` - Get current observability configuration
 - `PUT /api/observability/logs` - Configure access logs and Graylog integration
 - `PUT /api/observability/metrics` - Configure Prometheus metrics endpoint
 - `PUT /api/observability/tracing` - Configure OpenTelemetry tracing
 - `POST /api/observability/test` - Test connections to external observability systems
-- `GET /api/observability/info` - Get info page data (endpoints, configs, examples)
+
+### Implemented Endpoints (Configuration Management - Phase 5.5) ✅
+- `GET /api/config/ui` - Get full UI configuration with presets
+- `PUT /api/config/ui` - Update UI configuration
+- `POST /api/config/ui/backup` - Create manual backup
+- `GET /api/config/ui/backups` - List available backups
+- `GET /api/config/ui/backups/:filename/download` - Download specific backup
+- `DELETE /api/config/ui/backups/:filename` - Delete specific backup
+- `POST /api/config/ui/restore` - Restore from backup
+- `GET /api/config/ui/export` - Export configuration for download
+- `POST /api/config/ui/import` - Import configuration from upload
+- `POST /api/config/ui/validate` - Validate configuration without saving
 
 ### Planned Endpoints (Remote Proxy Configuration - Phase 6)
 - `GET /api/proxy/config` - Get current proxy and IP forwarding configuration

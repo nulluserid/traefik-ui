@@ -1,22 +1,64 @@
 # Traefik UI
 
-**Version 0.0.3**
+**Version 0.0.6** - **Enterprise-Grade Network & Observability Management**
 
-A simple web interface for managing Traefik proxy configurations without manually editing config files.
+A comprehensive web interface for managing Traefik proxy configurations with advanced network topology visualization, observability integration, and enterprise-grade configuration management.
 
-## Features
+## 🚀 Key Features
 
-- **Visual Configuration Management**: View current routes and services in a clean interface
+### **Core Configuration Management**
+- **Visual Configuration Interface**: Modern web UI for routes, services, and middleware management
 - **DNS Provider Management**: Named TSIG configurations for RFC2136 DNS challenges with reusable settings
 - **CrowdSec Integration**: Complete middleware management for CrowdSec bouncer plugin with AppSec support
-- **System Theme Support**: Automatic dark/light theme detection with manual toggle
 - **Enhanced TLS Options**: HTTP vs DNS challenge selection with Let's Encrypt integration
 - **Custom Certificate Support**: Upload PEM certificates with validation and automatic configuration
-- **Form-Based Route Creation**: Easy forms to add new proxy routes with middleware selection
+
+### **🌐 Network Management (NEW in v0.0.6)**
+- **Multi-Stack Network Discovery**: Scan and connect Traefik to external Docker networks
+- **Network Topology Visualization**: Interactive network maps showing container relationships
+- **Smart Route Validation**: Automatic network connectivity checks during route creation
+- **Cross-Stack Integration**: Enable services from external stacks to use Traefik
+
+### **📊 Domain Overview & Health Dashboard (NEW in v0.0.6)**
+- **Comprehensive Domain Analysis**: Real-time health monitoring with status indicators
+- **Backend Target Analysis**: Complete routing path visualization (domain → service → container)
+- **Configuration Conflict Detection**: Automatic identification of routing conflicts and orphaned services
+- **Multi-tab Domain Details**: Complete configuration analysis with observability data
+
+### **🔍 Observability & Monitoring (NEW in v0.0.6)**
+- **Preset Management System**: Production, Development, Minimal, and Custom configuration modes
+- **Access Logs Configuration**: JSON/CLF formatting with Graylog integration support
+- **Prometheus Metrics**: Configurable endpoints with category selection and sample configs
+- **OpenTelemetry Tracing**: Support for Jaeger, Zipkin, and OTLP backends with sampling control
+- **One-Click Configuration**: Automatic preset deployment with real-time form updates
+
+### **⚙️ Configuration Management (NEW in v0.0.6)**
+- **Backup & Restore System**: Manual and automatic backups with metadata tracking
+- **Version Migration**: Automatic schema migration between versions
+- **Import/Export**: Configuration portability with validation
 - **Template System**: Pre-configured templates for common scenarios
-- **One-Click Deployment**: Complete Docker Compose setup with automated installation script
-- **Service Management**: Automatically create backend services when adding routes
-- **Restart Integration**: Restart Traefik directly from the UI
+
+### **🎨 Enhanced User Experience**
+- **Cyberpunk Theme**: Enhanced contrast and readability with responsive design
+- **Organized Navigation**: Grouped menu system (Monitoring, Configuration, Tools)
+- **Docker Label Generator**: Generate Traefik labels for docker-compose services
+- **System Theme Support**: Automatic dark/light theme detection with manual toggle
+
+## 🆕 What's New in v0.0.6
+
+### **Revolutionary Network & Observability Features**
+- **🌐 Domain Overview Dashboard**: Comprehensive health analysis with real-time topology mapping
+- **📊 Observability Presets**: One-click configuration for Production, Development, and Minimal setups
+- **🔍 Network Topology Visualization**: Interactive maps showing domain → service → container → network flow
+- **⚙️ Configuration Management**: Complete backup/restore system with automatic version migration
+- **🚀 Enhanced Performance**: Parallel configuration application and real-time status updates
+
+### **Enterprise-Grade Monitoring**
+- **Access Logs**: JSON/CLF formatting with external Graylog integration
+- **Prometheus Metrics**: Configurable endpoints with automatic Prometheus config generation
+- **OpenTelemetry Tracing**: Full support for Jaeger, Zipkin, and OTLP backends
+- **Health Monitoring**: Container inspection, network connectivity analysis, and certificate validation
+- **Conflict Detection**: Automatic identification of routing conflicts and configuration issues
 
 ## Quick Start
 
