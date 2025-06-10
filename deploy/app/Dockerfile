@@ -14,7 +14,6 @@ COPY . .
 
 # Create non-root user and docker group access
 RUN addgroup -g 1001 -S nodejs
-RUN addgroup -g 999 -S docker
 RUN adduser -S traefik-ui -u 1001 -G nodejs
 RUN adduser traefik-ui docker
 
