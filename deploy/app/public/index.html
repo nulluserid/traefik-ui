@@ -22,6 +22,7 @@
             <button class="tab-btn" data-tab="middleware">Middleware</button>
             <button class="tab-btn" data-tab="dns-providers">DNS Providers</button>
             <button class="tab-btn" data-tab="label-generator">Label Generator</button>
+            <button class="tab-btn" data-tab="service-discovery">Service Discovery</button>
             <button class="tab-btn" data-tab="templates">Templates</button>
         </div>
 
@@ -436,6 +437,86 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...
                         <h3>Development Service</h3>
                         <p>Local development with HTTP and TLS bypass</p>
                         <button class="btn btn-secondary">Use Template</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="service-discovery" class="tab-content">
+            <div class="section">
+                <h2>Docker Service Discovery</h2>
+                <p>Discover and manage services that have Traefik labels in their Docker containers.</p>
+                
+                <div class="service-discovery-controls">
+                    <button id="scan-services" class="btn btn-primary">🔍 Scan for Services</button>
+                    <button id="refresh-services" class="btn btn-secondary">🔄 Refresh</button>
+                    <span id="scan-status" class="scan-status"></span>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Discovered Services</h2>
+                <div class="service-filter">
+                    <select id="service-filter">
+                        <option value="all">All Services</option>
+                        <option value="running">Running Only</option>
+                        <option value="stopped">Stopped Only</option>
+                        <option value="traefik-enabled">Traefik Enabled</option>
+                    </select>
+                </div>
+                <div id="discovered-services" class="discovered-services-container">
+                    <p>Click "Scan for Services" to discover Docker containers with Traefik labels.</p>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Docker Networks</h2>
+                <div id="docker-networks" class="networks-container">
+                    <p>Loading network information...</p>
+                </div>
+            </div>
+            
+            <div id="service-edit-modal" class="modal hidden">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Edit Service Labels</h3>
+                        <button class="modal-close" id="close-service-modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="service-edit-form">
+                            <input type="hidden" id="edit-container-id">
+                            <div class="form-group">
+                                <label for="edit-service-name">Service Name:</label>
+                                <input type="text" id="edit-service-name" readonly>
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-traefik-enabled">Traefik Enabled:</label>
+                                <select id="edit-traefik-enabled">
+                                    <option value="true">Enabled</option>
+                                    <option value="false">Disabled</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-router-rule">Router Rule:</label>
+                                <input type="text" id="edit-router-rule" placeholder="Host(`example.com`)">
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-entrypoints">Entrypoints:</label>
+                                <input type="text" id="edit-entrypoints" placeholder="web,websecure">
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-service-port">Service Port:</label>
+                                <input type="number" id="edit-service-port" placeholder="80">
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-middlewares">Middlewares:</label>
+                                <input type="text" id="edit-middlewares" placeholder="middleware1,middleware2">
+                            </div>
+                            <div class="modal-actions">
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                                <button type="button" class="btn btn-secondary" id="cancel-edit">Cancel</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>

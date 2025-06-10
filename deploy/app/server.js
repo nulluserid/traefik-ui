@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 const { exec } = require('child_process');
+const Docker = require('dockerode');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -288,6 +289,175 @@ app.delete('/api/certificate/:hostname', (req, res) => {
     }
     
     res.json({ success: true, message: 'Certificate deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Docker API integration
+const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+
+// Helper function to parse Traefik labels from containers
+function parseTraefikLabels(labels) {
+  const traefikLabels = {};
+  const otherLabels = {};
+  
+  for (const [key, value] of Object.entries(labels || {})) {
+    if (key.startsWith('traefik.')) {
+      traefikLabels[key] = value;
+    } else {
+      otherLabels[key] = value;
+    }
+  }
+  
+  return { traefikLabels, otherLabels };
+}
+
+// Helper function to extract key Traefik configuration from labels
+function extractTraefikConfig(traefikLabels) {
+  const config = {
+    enabled: traefikLabels['traefik.enable'] === 'true',
+    routers: {},
+    services: {},
+    middlewares: []
+  };
+  
+  // Parse router configuration
+  for (const [key, value] of Object.entries(traefikLabels)) {
+    const routerMatch = key.match(/^traefik\.http\.routers\.([^.]+)\.(.+)$/);
+    if (routerMatch) {
+      const [, routerName, property] = routerMatch;
+      if (!config.routers[routerName]) config.routers[routerName] = {};
+      config.routers[routerName][property] = value;
+    }
+    
+    const serviceMatch = key.match(/^traefik\.http\.services\.([^.]+)\.(.+)$/);
+    if (serviceMatch) {
+      const [, serviceName, property] = serviceMatch;
+      if (!config.services[serviceName]) config.services[serviceName] = {};
+      config.services[serviceName][property] = value;
+    }
+  }
+  
+  return config;
+}
+
+// Docker API endpoints
+app.get('/api/docker/services', async (req, res) => {
+  try {
+    const containers = await docker.listContainers({ all: true });
+    const services = [];
+    
+    for (const containerInfo of containers) {
+      const container = docker.getContainer(containerInfo.Id);
+      const details = await container.inspect();
+      
+      const { traefikLabels, otherLabels } = parseTraefikLabels(details.Config.Labels);
+      const traefikConfig = extractTraefikConfig(traefikLabels);
+      
+      // Get network information
+      const networks = Object.keys(details.NetworkSettings.Networks || {});
+      
+      services.push({
+        id: details.Id,
+        name: details.Name.replace('/', ''),
+        image: details.Config.Image,
+        state: details.State.Status,
+        status: details.State.Running ? 'running' : 'stopped',
+        created: details.Created,
+        ports: containerInfo.Ports || [],
+        networks: networks,
+        labels: {
+          traefik: traefikLabels,
+          other: otherLabels
+        },
+        traefikConfig: traefikConfig,
+        compose: {
+          project: details.Config.Labels['com.docker.compose.project'] || 'unknown',
+          service: details.Config.Labels['com.docker.compose.service'] || 'unknown'
+        }
+      });
+    }
+    
+    res.json(services);
+  } catch (error) {
+    console.error('Docker API error:', error);
+    res.status(500).json({ error: 'Failed to connect to Docker daemon. Ensure Docker socket is accessible.' });
+  }
+});
+
+app.get('/api/docker/networks', async (req, res) => {
+  try {
+    const networks = await docker.listNetworks();
+    const networkDetails = [];
+    
+    for (const networkInfo of networks) {
+      const network = docker.getNetwork(networkInfo.Id);
+      const details = await network.inspect();
+      
+      // Get containers in this network
+      const containers = Object.keys(details.Containers || {}).map(containerId => {
+        const containerInfo = details.Containers[containerId];
+        return {
+          id: containerId.substring(0, 12),
+          name: containerInfo.Name,
+          ipAddress: containerInfo.IPv4Address
+        };
+      });
+      
+      networkDetails.push({
+        id: details.Id,
+        name: details.Name,
+        driver: details.Driver,
+        scope: details.Scope,
+        created: details.Created,
+        containers: containers,
+        options: details.Options || {},
+        labels: details.Labels || {}
+      });
+    }
+    
+    res.json(networkDetails);
+  } catch (error) {
+    console.error('Docker networks error:', error);
+    res.status(500).json({ error: 'Failed to get Docker networks' });
+  }
+});
+
+app.put('/api/docker/labels/:containerId', async (req, res) => {
+  try {
+    const { containerId } = req.params;
+    const { labels } = req.body;
+    
+    // Note: Docker API doesn't allow direct label modification on running containers
+    // This would typically require container recreation or docker-compose changes
+    // For now, we'll return the labels that would be applied
+    
+    res.json({ 
+      success: true, 
+      message: 'Label update prepared (requires container recreation to apply)',
+      containerId,
+      labels
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/docker/status/:containerId', async (req, res) => {
+  try {
+    const { containerId } = req.params;
+    const container = docker.getContainer(containerId);
+    const details = await container.inspect();
+    
+    res.json({
+      id: details.Id,
+      name: details.Name,
+      state: details.State,
+      health: details.State.Health || null,
+      restartCount: details.RestartCount,
+      lastStarted: details.State.StartedAt
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

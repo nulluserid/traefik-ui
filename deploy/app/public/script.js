@@ -55,6 +55,14 @@ class TraefikUI {
         document.getElementById('generate-labels').addEventListener('click', () => this.generateLabels());
         document.getElementById('copy-labels').addEventListener('click', () => this.copyLabelsToClipboard());
 
+        // Service Discovery Event Listeners
+        document.getElementById('scan-services').addEventListener('click', () => this.scanDockerServices());
+        document.getElementById('refresh-services').addEventListener('click', () => this.refreshServices());
+        document.getElementById('service-filter').addEventListener('change', (e) => this.filterServices(e.target.value));
+        document.getElementById('close-service-modal').addEventListener('click', () => this.closeServiceModal());
+        document.getElementById('cancel-edit').addEventListener('click', () => this.closeServiceModal());
+        document.getElementById('service-edit-form').addEventListener('submit', (e) => this.handleServiceEdit(e));
+
         document.querySelectorAll('.template-card').forEach(card => {
             card.addEventListener('click', () => this.useTemplate(card.dataset.template));
         });
@@ -958,6 +966,290 @@ networks:
         document.getElementById('label-enable-crowdsec').dispatchEvent(new Event('change'));
 
         this.showNotification(`Applied ${templateType.replace('-', ' ')} template`, 'success');
+    }
+
+    // Service Discovery Methods
+    async scanDockerServices() {
+        const scanStatus = document.getElementById('scan-status');
+        const scanButton = document.getElementById('scan-services');
+        
+        try {
+            scanStatus.textContent = '🔍 Scanning Docker containers...';
+            scanButton.disabled = true;
+            
+            const response = await fetch('/api/docker/services');
+            if (!response.ok) {
+                throw new Error('Failed to connect to Docker daemon');
+            }
+            
+            const services = await response.json();
+            this.displayDiscoveredServices(services);
+            
+            scanStatus.textContent = `✅ Found ${services.length} containers`;
+            
+            // Also load networks
+            await this.loadDockerNetworks();
+            
+        } catch (error) {
+            console.error('Failed to scan Docker services:', error);
+            scanStatus.textContent = '❌ Failed to scan Docker services';
+            this.showNotification(error.message, 'error');
+        } finally {
+            scanButton.disabled = false;
+        }
+    }
+
+    async refreshServices() {
+        await this.scanDockerServices();
+    }
+
+    displayDiscoveredServices(services) {
+        const container = document.getElementById('discovered-services');
+        
+        if (services.length === 0) {
+            container.innerHTML = '<p>No Docker containers found.</p>';
+            return;
+        }
+
+        container.innerHTML = services.map(service => {
+            const traefikEnabled = service.traefikConfig.enabled;
+            const routerNames = Object.keys(service.traefikConfig.routers);
+            const primaryRouter = routerNames[0];
+            const routerConfig = primaryRouter ? service.traefikConfig.routers[primaryRouter] : {};
+            
+            // Get status class
+            let statusClass = service.status;
+            if (traefikEnabled) statusClass += ' traefik-enabled';
+            
+            // Format ports
+            const ports = service.ports.map(p => 
+                p.PublicPort ? `${p.PrivatePort}:${p.PublicPort}` : p.PrivatePort
+            ).join(', ') || 'None';
+            
+            // Format Traefik labels for display
+            const traefikLabels = Object.entries(service.labels.traefik).map(([key, value]) => 
+                `<div class="label-item"><span class="label-key">${key}:</span> ${value}</div>`
+            ).join('');
+
+            return `
+                <div class="discovered-service-card ${statusClass}" data-id="${service.id}">
+                    <div class="service-header">
+                        <div class="service-info">
+                            <div class="service-title">${service.name}</div>
+                            <div class="service-subtitle">${service.compose.project}/${service.compose.service}</div>
+                        </div>
+                        <div class="service-status">
+                            <span class="status-badge ${service.status}">${service.status.toUpperCase()}</span>
+                            ${traefikEnabled ? 
+                                '<span class="status-badge traefik-enabled">TRAEFIK</span>' : 
+                                '<span class="status-badge traefik-disabled">NO TRAEFIK</span>'
+                            }
+                        </div>
+                    </div>
+                    
+                    <div class="service-details">
+                        <div class="service-detail-section">
+                            <div class="detail-label">Image</div>
+                            <div class="detail-value">${service.image}</div>
+                        </div>
+                        <div class="service-detail-section">
+                            <div class="detail-label">Ports</div>
+                            <div class="detail-value">${ports}</div>
+                        </div>
+                        <div class="service-detail-section">
+                            <div class="detail-label">Networks</div>
+                            <div class="detail-value">${service.networks.join(', ') || 'None'}</div>
+                        </div>
+                        ${routerConfig.rule ? `
+                        <div class="service-detail-section">
+                            <div class="detail-label">Route Rule</div>
+                            <div class="detail-value">${routerConfig.rule}</div>
+                        </div>
+                        ` : ''}
+                    </div>
+                    
+                    ${traefikLabels ? `
+                    <div class="service-labels">
+                        <h4>Traefik Labels (${Object.keys(service.labels.traefik).length})</h4>
+                        <div class="labels-list">
+                            ${traefikLabels}
+                        </div>
+                    </div>
+                    ` : ''}
+                    
+                    <div class="service-actions">
+                        <button class="btn btn-secondary btn-sm" onclick="ui.viewServiceDetails('${service.id}')">
+                            📋 Details
+                        </button>
+                        ${traefikEnabled ? `
+                        <button class="btn btn-primary btn-sm" onclick="ui.editServiceLabels('${service.id}')">
+                            ✏️ Edit Labels
+                        </button>
+                        ` : `
+                        <button class="btn btn-accent btn-sm" onclick="ui.enableTraefik('${service.id}')">
+                            🚀 Enable Traefik
+                        </button>
+                        `}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    filterServices(filter) {
+        const cards = document.querySelectorAll('.discovered-service-card');
+        
+        cards.forEach(card => {
+            let show = true;
+            
+            switch (filter) {
+                case 'running':
+                    show = card.classList.contains('running');
+                    break;
+                case 'stopped':
+                    show = card.classList.contains('stopped');
+                    break;
+                case 'traefik-enabled':
+                    show = card.classList.contains('traefik-enabled');
+                    break;
+                case 'all':
+                default:
+                    show = true;
+                    break;
+            }
+            
+            card.style.display = show ? 'block' : 'none';
+        });
+    }
+
+    async loadDockerNetworks() {
+        try {
+            const response = await fetch('/api/docker/networks');
+            if (!response.ok) {
+                throw new Error('Failed to load Docker networks');
+            }
+            
+            const networks = await response.json();
+            this.displayDockerNetworks(networks);
+            
+        } catch (error) {
+            console.error('Failed to load Docker networks:', error);
+            document.getElementById('docker-networks').innerHTML = '<p>Failed to load Docker networks</p>';
+        }
+    }
+
+    displayDockerNetworks(networks) {
+        const container = document.getElementById('docker-networks');
+        
+        if (networks.length === 0) {
+            container.innerHTML = '<p>No Docker networks found.</p>';
+            return;
+        }
+
+        // Filter out system networks for cleaner display
+        const userNetworks = networks.filter(net => 
+            !['bridge', 'host', 'none'].includes(net.name)
+        );
+
+        container.innerHTML = userNetworks.map(network => `
+            <div class="network-card">
+                <div class="network-header">
+                    <span class="network-name">${network.name}</span>
+                    <span class="network-driver">${network.driver.toUpperCase()}</span>
+                </div>
+                <div class="network-details">
+                    <div>ID: ${network.id.substring(0, 12)}</div>
+                    <div>Scope: ${network.scope}</div>
+                    <div>Created: ${new Date(network.created).toLocaleDateString()}</div>
+                </div>
+                ${network.containers.length > 0 ? `
+                <div class="network-containers">
+                    <h4>Connected Containers (${network.containers.length})</h4>
+                    <div class="container-list">
+                        ${network.containers.map(container => 
+                            `<span class="container-badge">${container.name}</span>`
+                        ).join('')}
+                    </div>
+                </div>
+                ` : ''}
+            </div>
+        `).join('');
+    }
+
+    async viewServiceDetails(serviceId) {
+        try {
+            const response = await fetch(`/api/docker/status/${serviceId}`);
+            if (!response.ok) {
+                throw new Error('Failed to get service details');
+            }
+            
+            const details = await response.json();
+            
+            // Create a simple details display (could be enhanced with a modal)
+            const detailsHtml = `
+                <div class="service-details-popup">
+                    <h3>Service Details: ${details.name}</h3>
+                    <pre>${JSON.stringify(details, null, 2)}</pre>
+                </div>
+            `;
+            
+            this.showNotification(`Service ${details.name} details logged to console`, 'info');
+            console.log('Service Details:', details);
+            
+        } catch (error) {
+            this.showNotification('Failed to get service details', 'error');
+        }
+    }
+
+    editServiceLabels(serviceId) {
+        // For now, just show the modal with a message
+        // In a full implementation, this would populate the modal with current labels
+        document.getElementById('edit-container-id').value = serviceId;
+        document.getElementById('service-edit-modal').classList.remove('hidden');
+        
+        this.showNotification('Label editing interface opened (implementation pending)', 'info');
+    }
+
+    enableTraefik(serviceId) {
+        // This would typically generate basic Traefik labels for the service
+        this.showNotification('Traefik enablement requires container recreation with labels', 'info');
+        
+        // Could integrate with the Label Generator to create appropriate labels
+        this.switchTab('label-generator');
+    }
+
+    closeServiceModal() {
+        document.getElementById('service-edit-modal').classList.add('hidden');
+    }
+
+    async handleServiceEdit(e) {
+        e.preventDefault();
+        
+        const containerId = document.getElementById('edit-container-id').value;
+        const formData = new FormData(e.target);
+        
+        // Build labels object from form
+        const labels = {};
+        
+        // This is a simplified implementation
+        // In practice, you'd build the complete label set based on form inputs
+        
+        try {
+            const response = await fetch(`/api/docker/labels/${containerId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ labels })
+            });
+            
+            if (response.ok) {
+                this.showNotification('Labels updated (container recreation required)', 'success');
+                this.closeServiceModal();
+            } else {
+                throw new Error('Failed to update labels');
+            }
+        } catch (error) {
+            this.showNotification('Failed to update service labels', 'error');
+        }
     }
 
     showNotification(message, type = 'success') {

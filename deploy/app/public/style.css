@@ -334,6 +334,15 @@ h1 {
     background-color: var(--text-tertiary);
 }
 
+.btn-accent {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.btn-accent:hover {
+    background-color: var(--accent-hover);
+}
+
 .btn-warning {
     background-color: var(--warning-color);
     color: var(--warning-text);
@@ -704,6 +713,314 @@ h1 {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* Service Discovery Styles */
+.service-discovery-controls {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.scan-status {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.service-filter {
+    margin-bottom: 20px;
+}
+
+.service-filter select {
+    padding: 8px 12px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.discovered-services-container {
+    display: grid;
+    gap: 15px;
+}
+
+.discovered-service-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    transition: all 0.2s ease;
+}
+
+.discovered-service-card:hover {
+    box-shadow: 0 2px 8px var(--shadow-hover);
+}
+
+.discovered-service-card.running {
+    border-left: 4px solid var(--success-color);
+}
+
+.discovered-service-card.stopped {
+    border-left: 4px solid var(--danger-color);
+}
+
+.discovered-service-card.traefik-enabled {
+    border-left: 4px solid var(--accent-color);
+}
+
+.service-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.service-info {
+    flex: 1;
+}
+
+.service-title {
+    font-size: 1.2em;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 5px;
+}
+
+.service-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+}
+
+.service-status {
+    display: flex;
+    gap: 10px;
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: 500;
+}
+
+.status-badge.running {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.status-badge.stopped {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.status-badge.traefik-enabled {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.status-badge.traefik-disabled {
+    background-color: var(--text-tertiary);
+    color: white;
+}
+
+.service-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.service-detail-section {
+    background: var(--bg-tertiary);
+    padding: 12px;
+    border-radius: 6px;
+}
+
+.detail-label {
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-size: 0.9em;
+    margin-bottom: 5px;
+}
+
+.detail-value {
+    color: var(--text-primary);
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.85em;
+    word-break: break-all;
+}
+
+.service-labels {
+    margin-top: 10px;
+}
+
+.service-labels h4 {
+    margin-bottom: 8px;
+    color: var(--text-primary);
+    font-size: 1em;
+}
+
+.labels-list {
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    padding: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.label-item {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.8em;
+    color: var(--text-primary);
+    margin-bottom: 3px;
+    padding: 2px 0;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.label-item:last-child {
+    border-bottom: none;
+}
+
+.label-key {
+    color: var(--accent-color);
+    font-weight: 500;
+}
+
+.service-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.networks-container {
+    display: grid;
+    gap: 15px;
+}
+
+.network-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.network-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.network-name {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.network-driver {
+    background: var(--accent-color);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+}
+
+.network-details {
+    color: var(--text-secondary);
+    font-size: 0.9em;
+}
+
+.network-containers {
+    margin-top: 10px;
+}
+
+.network-containers h4 {
+    margin-bottom: 8px;
+    color: var(--text-primary);
+    font-size: 0.95em;
+}
+
+.container-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.container-badge {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    color: var(--text-primary);
+}
+
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-close:hover {
+    color: var(--text-primary);
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
 }
 
 @media (max-width: 768px) {
