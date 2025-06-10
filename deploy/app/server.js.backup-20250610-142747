@@ -5,19 +5,11 @@ const yaml = require('js-yaml');
 const { exec } = require('child_process');
 const Docker = require('dockerode');
 
-// Import route modules
-const errorRoutes = require('./routes/error-routes');
-const dnsRoutes = require('./routes/dns-routes');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.static('public'));
-
-// Use route modules
-app.use(errorRoutes);
-app.use(dnsRoutes);
 
 const TRAEFIK_CONFIG_PATH = process.env.TRAEFIK_CONFIG || '/etc/traefik/traefik.yml';
 const DYNAMIC_CONFIG_PATH = process.env.DYNAMIC_CONFIG || '/etc/traefik/dynamic.yml';
@@ -466,6 +458,151 @@ app.get('/api/docker/status/:containerId', async (req, res) => {
       restartCount: details.RestartCount,
       lastStarted: details.State.StartedAt
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DNS Provider management
+const DNS_PROVIDERS_PATH = path.join(__dirname, 'dns-providers.json');
+
+// Ensure DNS providers file exists
+if (!fs.existsSync(DNS_PROVIDERS_PATH)) {
+  fs.writeFileSync(DNS_PROVIDERS_PATH, JSON.stringify([], null, 2));
+}
+
+function loadDNSProviders() {
+  try {
+    return JSON.parse(fs.readFileSync(DNS_PROVIDERS_PATH, 'utf8'));
+  } catch (error) {
+    console.error('Error loading DNS providers:', error);
+    return [];
+  }
+}
+
+function saveDNSProviders(providers) {
+  try {
+    fs.writeFileSync(DNS_PROVIDERS_PATH, JSON.stringify(providers, null, 2));
+    return true;
+  } catch (error) {
+    console.error('Error saving DNS providers:', error);
+    return false;
+  }
+}
+
+// Get all DNS providers
+app.get('/api/dns-providers', (req, res) => {
+  try {
+    const providers = loadDNSProviders();
+    res.json(providers);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add new DNS provider
+app.post('/api/dns-providers', (req, res) => {
+  try {
+    const { name, type, config } = req.body;
+    
+    if (!name || !type || !config) {
+      return res.status(400).json({ error: 'Name, type, and config are required' });
+    }
+    
+    const providers = loadDNSProviders();
+    
+    // Check if provider already exists
+    if (providers.some(p => p.name === name)) {
+      return res.status(400).json({ error: 'DNS provider with this name already exists' });
+    }
+    
+    // Validate RFC2136 config
+    if (type === 'rfc2136') {
+      const requiredFields = ['nameserver', 'tsigKey', 'tsigSecret', 'tsigAlgorithm'];
+      for (const field of requiredFields) {
+        if (!config[field]) {
+          return res.status(400).json({ error: `${field} is required for RFC2136 provider` });
+        }
+      }
+    }
+    
+    const newProvider = {
+      name,
+      type,
+      config,
+      createdAt: new Date().toISOString()
+    };
+    
+    providers.push(newProvider);
+    
+    if (saveDNSProviders(providers)) {
+      res.json({ success: true, message: 'DNS provider added successfully', provider: newProvider });
+    } else {
+      res.status(500).json({ error: 'Failed to save DNS provider' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete DNS provider
+app.delete('/api/dns-providers/:name', (req, res) => {
+  try {
+    const { name } = req.params;
+    const providers = loadDNSProviders();
+    
+    const providerIndex = providers.findIndex(p => p.name === name);
+    if (providerIndex === -1) {
+      return res.status(404).json({ error: 'DNS provider not found' });
+    }
+    
+    providers.splice(providerIndex, 1);
+    
+    if (saveDNSProviders(providers)) {
+      res.json({ success: true, message: 'DNS provider deleted successfully' });
+    } else {
+      res.status(500).json({ error: 'Failed to delete DNS provider' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Test DNS provider
+app.post('/api/dns-providers/:name/test', (req, res) => {
+  try {
+    const { name } = req.params;
+    const providers = loadDNSProviders();
+    
+    const provider = providers.find(p => p.name === name);
+    if (!provider) {
+      return res.status(404).json({ error: 'DNS provider not found' });
+    }
+    
+    // Basic validation test
+    if (provider.type === 'rfc2136') {
+      const { nameserver, tsigKey, tsigSecret, tsigAlgorithm } = provider.config;
+      
+      if (!nameserver || !tsigKey || !tsigSecret || !tsigAlgorithm) {
+        return res.status(400).json({ error: 'Provider configuration is incomplete' });
+      }
+      
+      // Test nameserver format
+      if (!nameserver.includes(':')) {
+        return res.status(400).json({ error: 'Nameserver must include port (e.g., ns1.example.com:53)' });
+      }
+      
+      // For now, we'll do basic validation. 
+      // In a production system, you might want to actually test DNS connectivity
+      res.json({ 
+        success: true, 
+        message: 'DNS provider configuration is valid',
+        provider: provider.name,
+        type: provider.type
+      });
+    } else {
+      res.status(400).json({ error: 'Unsupported provider type for testing' });
+    }
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -2774,6 +2911,78 @@ function isValidIPOrCIDR(ip) {
   
   return ipv4Regex.test(ip) || ipv6Regex.test(ip);
 }
+
+// Error logging endpoint
+app.post('/api/errors/log', (req, res) => {
+  try {
+    const { errors } = req.body;
+    if (!errors || !Array.isArray(errors)) {
+      return res.status(400).json({ error: 'Invalid error data' });
+    }
+
+    // Create error log directory outside container
+    const errorLogDir = '/logs/ui-errors';
+    const errorLogFile = path.join(errorLogDir, 'client-errors.jsonl');
+    
+    // Ensure directory exists
+    fs.mkdirSync(errorLogDir, { recursive: true });
+
+    // Append errors to log file (one JSON object per line)
+    const logEntries = errors.map(error => JSON.stringify({
+      ...error,
+      serverTimestamp: new Date().toISOString(),
+      serverIP: req.ip || req.connection.remoteAddress,
+      userAgent: req.headers['user-agent']
+    })).join('\n') + '\n';
+
+    fs.appendFileSync(errorLogFile, logEntries);
+
+    // Also log to console for immediate visibility
+    console.log(`🚨 ${errors.length} client error(s) logged to ${errorLogFile}`);
+    errors.forEach(error => {
+      console.error(`  ${error.type}: ${error.message} (${error.component || 'unknown'}) at ${error.url}`);
+    });
+
+    res.json({ success: true, logged: errors.length });
+  } catch (error) {
+    console.error('Failed to log client errors:', error);
+    res.status(500).json({ error: 'Failed to log errors' });
+  }
+});
+
+// Error log viewer endpoint
+app.get('/api/errors/recent', (req, res) => {
+  try {
+    const errorLogFile = '/logs/ui-errors/client-errors.jsonl';
+    const limit = parseInt(req.query.limit) || 50;
+    
+    if (!fs.existsSync(errorLogFile)) {
+      return res.json({ errors: [], total: 0 });
+    }
+
+    const logData = fs.readFileSync(errorLogFile, 'utf8');
+    const lines = logData.trim().split('\n').filter(line => line.trim());
+    const errors = lines.map(line => {
+      try {
+        return JSON.parse(line);
+      } catch (e) {
+        return null;
+      }
+    }).filter(Boolean);
+
+    // Return most recent errors
+    const recentErrors = errors.slice(-limit).reverse();
+    
+    res.json({ 
+      errors: recentErrors, 
+      total: errors.length,
+      filename: errorLogFile 
+    });
+  } catch (error) {
+    console.error('Failed to read error log:', error);
+    res.status(500).json({ error: 'Failed to read error log' });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Traefik UI running on http://localhost:${PORT}`);
