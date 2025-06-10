@@ -654,7 +654,7 @@ app.get('/api/networks/management', async (req, res) => {
         options: details.Options || {},
         labels: details.Labels || {},
         internal: details.Internal || false,
-        attachable: details.Attachable === true,
+        attachable: details.Attachable === true || (!details.Internal && details.Driver === 'bridge'),
         ingress: details.Ingress || false
       });
     }

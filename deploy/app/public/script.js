@@ -1437,7 +1437,7 @@ networks:
 
     createNetworkCard(network) {
         const isConnected = network.isTraefikConnected;
-        const canConnect = !isConnected && network.attachable && network.name !== 'none';
+        const canConnect = !isConnected && network.attachable && !['none', 'host', 'bridge'].includes(network.name);
         const isPrimary = network.name === 'deploy_traefik';
         const canDisconnect = isConnected && !isPrimary;
         
