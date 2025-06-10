@@ -20,6 +20,7 @@
             <div class="nav-group">
                 <span class="nav-group-label">📊 Monitoring</span>
                 <button class="tab-btn active" data-tab="overview">Overview</button>
+                <button class="tab-btn" data-tab="domain-overview">Domain Overview</button>
                 <button class="tab-btn" data-tab="service-discovery">Service Discovery</button>
                 <button class="tab-btn" data-tab="network-management">Network Management</button>
             </div>
@@ -50,6 +51,44 @@
                 <h2>Services</h2>
                 <div id="services-list" class="services-container">
                     <p>Loading...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="domain-overview" class="tab-content">
+            <div class="section">
+                <h2>Domain Overview</h2>
+                <p>Comprehensive view of all domains with their routing paths, health status, and observability data.</p>
+                
+                <div class="domain-overview-controls">
+                    <button id="scan-domains" class="btn btn-primary">🔍 Scan Domains</button>
+                    <button id="refresh-domains" class="btn btn-secondary">🔄 Refresh</button>
+                    <span id="domain-scan-status" class="scan-status"></span>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Domain Health Dashboard</h2>
+                <div class="domain-filter">
+                    <select id="domain-filter">
+                        <option value="all">All Domains</option>
+                        <option value="healthy">Healthy</option>
+                        <option value="warning">Warning</option>
+                        <option value="error">Error</option>
+                        <option value="external">External Backend</option>
+                        <option value="docker">Docker Backend</option>
+                    </select>
+                    <span id="domain-filter-status" class="filter-status"></span>
+                </div>
+                <div id="domain-cards" class="domain-cards-container">
+                    <p>Click "Scan Domains" to analyze routing topology and health status.</p>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Network Topology Map</h2>
+                <div id="network-topology-map" class="topology-map-container">
+                    <p>Domain topology will be displayed here after scanning.</p>
                 </div>
             </div>
         </div>
@@ -474,7 +513,9 @@ MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...
                         <option value="running">Running Only</option>
                         <option value="stopped">Stopped Only</option>
                         <option value="traefik-enabled">Traefik Enabled</option>
+                        <option value="traefik-disabled">Traefik Disabled</option>
                     </select>
+                    <span id="service-filter-status" class="filter-status"></span>
                 </div>
                 <div id="discovered-services" class="discovered-services-container">
                     <p>Click "Scan for Services" to discover Docker containers with Traefik labels.</p>

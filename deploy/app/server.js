@@ -654,7 +654,7 @@ app.get('/api/networks/management', async (req, res) => {
         options: details.Options || {},
         labels: details.Labels || {},
         internal: details.Internal || false,
-        attachable: details.Attachable !== false,
+        attachable: details.Attachable === true,
         ingress: details.Ingress || false
       });
     }
@@ -802,6 +802,322 @@ app.get('/api/networks/topology', async (req, res) => {
     res.status(500).json({ error: 'Failed to get network topology' });
   }
 });
+
+// Phase 4: Domain Overview API Endpoints
+
+// Get all domains with aggregated configuration
+app.get('/api/domains', async (req, res) => {
+  try {
+    let config = {};
+    if (fs.existsSync(DYNAMIC_CONFIG_PATH)) {
+      config = yaml.load(fs.readFileSync(DYNAMIC_CONFIG_PATH, 'utf8'));
+    }
+
+    const routers = config.http?.routers || {};
+    const services = config.http?.services || {};
+    const domains = [];
+
+    // Parse domains from routers
+    for (const [routerName, routerConfig] of Object.entries(routers)) {
+      const domain = extractDomainFromRule(routerConfig.rule);
+      if (!domain) continue;
+
+      const serviceName = routerConfig.service;
+      const serviceConfig = services[serviceName];
+      
+      // Analyze backend type
+      const backend = analyzeBackend(serviceConfig);
+      
+      // Determine health status
+      const health = await determineHealthStatus(domain, backend);
+      
+      // Get TLS configuration
+      const tlsConfig = analyzeTLSConfig(routerConfig);
+      
+      // Get middleware chain
+      const middlewares = routerConfig.middlewares || [];
+      
+      domains.push({
+        domain,
+        routerName,
+        serviceName,
+        backend,
+        health,
+        tlsConfig,
+        middlewares,
+        entrypoint: routerConfig.entrypoints?.[0] || 'web'
+      });
+    }
+
+    res.json({ domains, totalRouters: Object.keys(routers).length });
+  } catch (error) {
+    console.error('Domain analysis error:', error);
+    res.status(500).json({ error: 'Failed to analyze domains' });
+  }
+});
+
+// Get detailed configuration for specific domain
+app.get('/api/domains/:domain', async (req, res) => {
+  try {
+    const { domain } = req.params;
+    let config = {};
+    if (fs.existsSync(DYNAMIC_CONFIG_PATH)) {
+      config = yaml.load(fs.readFileSync(DYNAMIC_CONFIG_PATH, 'utf8'));
+    }
+
+    const routers = config.http?.routers || {};
+    const services = config.http?.services || {};
+    const middlewares = config.http?.middlewares || {};
+
+    // Find router for this domain
+    const routerEntry = Object.entries(routers).find(([name, routerConfig]) => 
+      extractDomainFromRule(routerConfig.rule) === domain
+    );
+
+    if (!routerEntry) {
+      return res.status(404).json({ error: 'Domain not found' });
+    }
+
+    const [routerName, routerConfig] = routerEntry;
+    const serviceName = routerConfig.service;
+    const serviceConfig = services[serviceName];
+
+    // Get detailed backend analysis
+    const backend = analyzeBackend(serviceConfig);
+    const backendDetails = await getBackendDetails(backend);
+    
+    // Get detailed TLS analysis
+    const tlsDetails = await getTLSDetails(domain, routerConfig);
+    
+    // Get middleware details
+    const middlewareDetails = await getMiddlewareDetails(routerConfig.middlewares || [], middlewares);
+    
+    // Get network path analysis
+    const networkPath = await analyzeNetworkPath(backend);
+
+    res.json({
+      domain,
+      routerName,
+      serviceName,
+      routerConfig,
+      serviceConfig,
+      backend,
+      backendDetails,
+      tlsDetails,
+      middlewareDetails,
+      networkPath,
+      health: await determineHealthStatus(domain, backend)
+    });
+  } catch (error) {
+    console.error('Domain details error:', error);
+    res.status(500).json({ error: 'Failed to get domain details' });
+  }
+});
+
+// Helper functions
+function extractDomainFromRule(rule) {
+  const hostMatch = rule.match(/Host\(`([^`]+)`\)/);
+  return hostMatch ? hostMatch[1] : null;
+}
+
+function analyzeBackend(serviceConfig) {
+  if (!serviceConfig?.loadBalancer?.servers?.[0]) {
+    return { type: 'unknown', url: null };
+  }
+
+  const url = serviceConfig.loadBalancer.servers[0].url;
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname;
+    
+    // Check if it's an IP address
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+      return { type: 'external', url, hostname, port: urlObj.port || urlObj.protocol === 'https:' ? 443 : 80 };
+    }
+    
+    // Check if it's a Docker container name
+    if (!hostname.includes('.')) {
+      return { type: 'docker', url, containerName: hostname, port: urlObj.port || urlObj.protocol === 'https:' ? 443 : 80 };
+    }
+    
+    // External hostname
+    return { type: 'external', url, hostname, port: urlObj.port || urlObj.protocol === 'https:' ? 443 : 80 };
+  } catch (error) {
+    return { type: 'invalid', url, error: error.message };
+  }
+}
+
+function analyzeTLSConfig(routerConfig) {
+  if (!routerConfig.tls) {
+    return { enabled: false, type: 'none' };
+  }
+
+  if (routerConfig.tls.certResolver) {
+    const resolver = routerConfig.tls.certResolver;
+    if (resolver.includes('staging')) {
+      return { enabled: true, type: 'letsencrypt-staging', resolver };
+    } else if (resolver.includes('dns')) {
+      return { enabled: true, type: 'letsencrypt-dns', resolver };
+    } else {
+      return { enabled: true, type: 'letsencrypt-http', resolver };
+    }
+  }
+
+  if (routerConfig.tls.domains) {
+    return { enabled: true, type: 'custom', domains: routerConfig.tls.domains };
+  }
+
+  return { enabled: true, type: 'unknown' };
+}
+
+async function determineHealthStatus(domain, backend) {
+  // Basic health determination - in production this could do actual health checks
+  let status = 'unknown';
+  let issues = [];
+
+  if (backend.type === 'invalid') {
+    status = 'error';
+    issues.push('Invalid backend URL');
+  } else if (backend.type === 'docker') {
+    // Check if container exists and is running
+    try {
+      const containers = await docker.listContainers({ all: true });
+      const container = containers.find(c => 
+        c.Names.some(name => name.includes(backend.containerName))
+      );
+      
+      if (!container) {
+        status = 'error';
+        issues.push('Container not found');
+      } else if (container.State !== 'running') {
+        status = 'error';
+        issues.push('Container not running');
+      } else {
+        status = 'healthy';
+      }
+    } catch (error) {
+      status = 'warning';
+      issues.push('Cannot verify container status');
+    }
+  } else if (backend.type === 'external') {
+    status = 'healthy'; // Assume external services are healthy
+  }
+
+  return { status, issues, lastChecked: new Date().toISOString() };
+}
+
+async function getBackendDetails(backend) {
+  if (backend.type === 'docker') {
+    try {
+      const containers = await docker.listContainers({ all: true });
+      const container = containers.find(c => 
+        c.Names.some(name => name.includes(backend.containerName))
+      );
+      
+      if (container) {
+        const details = await docker.getContainer(container.Id).inspect();
+        return {
+          containerId: container.Id.substring(0, 12),
+          image: container.Image,
+          state: container.State,
+          networks: Object.keys(details.NetworkSettings.Networks || {}),
+          compose: {
+            project: details.Config.Labels['com.docker.compose.project'] || 'unknown',
+            service: details.Config.Labels['com.docker.compose.service'] || 'unknown'
+          }
+        };
+      }
+    } catch (error) {
+      console.error('Error getting container details:', error);
+    }
+  }
+  
+  return null;
+}
+
+async function getTLSDetails(domain, routerConfig) {
+  const tlsConfig = analyzeTLSConfig(routerConfig);
+  
+  if (tlsConfig.type === 'custom') {
+    // Check if custom certificate exists
+    const certPath = path.join(__dirname, 'certs', `${domain}.crt`);
+    if (fs.existsSync(certPath)) {
+      try {
+        const cert = fs.readFileSync(certPath, 'utf8');
+        // Basic certificate parsing - in production you'd use a proper cert parser
+        return { ...tlsConfig, certificateExists: true };
+      } catch (error) {
+        return { ...tlsConfig, certificateExists: false, error: error.message };
+      }
+    }
+  }
+  
+  return tlsConfig;
+}
+
+async function getMiddlewareDetails(middlewareNames, allMiddlewares) {
+  return middlewareNames.map(name => {
+    const config = allMiddlewares[name];
+    if (!config) {
+      return { name, type: 'unknown', exists: false };
+    }
+    
+    // Determine middleware type
+    let type = 'unknown';
+    if (config.plugin?.['crowdsec-bouncer-traefik-plugin']) {
+      type = 'crowdsec';
+    } else if (config.rateLimit) {
+      type = 'rateLimit';
+    } else if (config.auth) {
+      type = 'auth';
+    } else if (config.headers) {
+      type = 'headers';
+    } else if (config.stripPrefix) {
+      type = 'stripPrefix';
+    }
+    
+    return { name, type, exists: true, config };
+  });
+}
+
+async function analyzeNetworkPath(backend) {
+  if (backend.type !== 'docker') {
+    return { type: 'external', path: [] };
+  }
+  
+  try {
+    // Get Traefik networks
+    const traefikContainer = docker.getContainer('traefik');
+    const traefikInfo = await traefikContainer.inspect();
+    const traefikNetworks = Object.keys(traefikInfo.NetworkSettings.Networks || {});
+    
+    // Find container networks
+    const containers = await docker.listContainers({ all: true });
+    const container = containers.find(c => 
+      c.Names.some(name => name.includes(backend.containerName))
+    );
+    
+    if (container) {
+      const details = await docker.getContainer(container.Id).inspect();
+      const containerNetworks = Object.keys(details.NetworkSettings.Networks || {});
+      
+      // Find common networks
+      const commonNetworks = traefikNetworks.filter(net => containerNetworks.includes(net));
+      
+      return {
+        type: 'docker',
+        traefikNetworks,
+        containerNetworks,
+        commonNetworks,
+        connected: commonNetworks.length > 0
+      };
+    }
+  } catch (error) {
+    console.error('Network path analysis error:', error);
+  }
+  
+  return { type: 'docker', connected: false, error: 'Analysis failed' };
+}
 
 app.listen(PORT, () => {
   console.log(`Traefik UI running on http://localhost:${PORT}`);

@@ -71,6 +71,11 @@ class TraefikUI {
         document.getElementById('cancel-network-connect').addEventListener('click', () => this.closeNetworkModal());
         document.getElementById('network-connect-form').addEventListener('submit', (e) => this.handleNetworkConnect(e));
 
+        // Domain Overview Event Listeners
+        document.getElementById('scan-domains').addEventListener('click', () => this.scanDomains());
+        document.getElementById('refresh-domains').addEventListener('click', () => this.refreshDomains());
+        document.getElementById('domain-filter').addEventListener('change', (e) => this.filterDomains(e.target.value));
+
         document.querySelectorAll('.template-card').forEach(card => {
             card.addEventListener('click', () => this.useTemplate(card.dataset.template));
         });
@@ -1119,6 +1124,7 @@ networks:
 
     filterServices(filter) {
         const cards = document.querySelectorAll('.discovered-service-card');
+        let visibleCount = 0;
         
         cards.forEach(card => {
             let show = true;
@@ -1133,14 +1139,28 @@ networks:
                 case 'traefik-enabled':
                     show = card.classList.contains('traefik-enabled');
                     break;
+                case 'traefik-disabled':
+                    show = !card.classList.contains('traefik-enabled');
+                    break;
                 case 'all':
                 default:
                     show = true;
                     break;
             }
             
-            card.style.display = show ? 'block' : 'none';
+            if (show) {
+                card.style.display = 'block';
+                visibleCount++;
+            } else {
+                card.style.display = 'none';
+            }
         });
+        
+        // Update filter status
+        const statusText = visibleCount === cards.length 
+            ? `Showing all ${cards.length} services`
+            : `Showing ${visibleCount} of ${cards.length} services`;
+        this.updateFilterStatus('service', statusText);
     }
 
     async loadDockerNetworks() {
@@ -1270,6 +1290,13 @@ networks:
             }
         } catch (error) {
             this.showNotification('Failed to update service labels', 'error');
+        }
+    }
+
+    updateFilterStatus(type, message) {
+        const statusElement = document.getElementById(`${type}-filter-status`);
+        if (statusElement) {
+            statusElement.textContent = message;
         }
     }
 
@@ -1411,13 +1438,15 @@ networks:
     createNetworkCard(network) {
         const isConnected = network.isTraefikConnected;
         const canConnect = !isConnected && network.attachable && network.name !== 'none';
+        const isPrimary = network.name === 'deploy_traefik';
+        const canDisconnect = isConnected && !isPrimary;
         
         return `
             <div class="network-card ${isConnected ? 'connected' : 'disconnected'}">
                 <div class="network-header">
                     <div class="network-info">
                         <div class="network-title">
-                            ${network.name}
+                            ${network.name} ${isPrimary ? '(Primary)' : ''}
                             <span class="status-badge ${isConnected ? 'connected' : 'disconnected'}">
                                 ${isConnected ? 'Connected' : 'Available'}
                             </span>
@@ -1431,10 +1460,12 @@ networks:
                             `<button class="btn btn-sm btn-primary" onclick="ui.openNetworkConnectModal('${network.id}', '${network.name}')">
                                 🔗 Connect
                             </button>` : 
-                            isConnected ? 
+                            canDisconnect ? 
                                 `<button class="btn btn-sm btn-danger" onclick="ui.disconnectFromNetwork('${network.id}', '${network.name}')">
                                     🔌 Disconnect
                                 </button>` :
+                            isConnected && isPrimary ?
+                                '<span class="text-muted">Cannot disconnect</span>' :
                                 '<span class="text-muted">Not attachable</span>'
                         }
                     </div>
@@ -1722,6 +1753,328 @@ networks:
                 resolve(false);
             };
         });
+    }
+
+    // Phase 4: Domain Overview Methods
+
+    async scanDomains() {
+        const scanStatus = document.getElementById('domain-scan-status');
+        const scanButton = document.getElementById('scan-domains');
+        
+        try {
+            scanStatus.textContent = '🔍 Analyzing domains and topology...';
+            scanButton.disabled = true;
+            
+            const response = await fetch('/api/domains');
+            if (!response.ok) {
+                throw new Error('Failed to scan domains');
+            }
+            
+            const data = await response.json();
+            this.displayDomainCards(data.domains);
+            this.displayNetworkTopologyMap(data.domains);
+            
+            scanStatus.textContent = `✅ Found ${data.domains.length} domains`;
+        } catch (error) {
+            this.showNotification(error.message, 'error');
+            scanStatus.textContent = '❌ Scan failed';
+        } finally {
+            scanButton.disabled = false;
+            setTimeout(() => {
+                scanStatus.textContent = '';
+            }, 3000);
+        }
+    }
+
+    async refreshDomains() {
+        if (!this.allDomains || this.allDomains.length === 0) {
+            this.showNotification('Click "Scan Domains" first to analyze topology', 'info');
+            return;
+        }
+        await this.scanDomains();
+    }
+
+    displayDomainCards(domains) {
+        const container = document.getElementById('domain-cards');
+        this.allDomains = domains;
+        
+        if (domains.length === 0) {
+            container.innerHTML = '<p>No domains found in Traefik configuration.</p>';
+            return;
+        }
+
+        container.innerHTML = domains.map(domain => this.createDomainCard(domain)).join('');
+        this.updateFilterStatus('domain', `Showing all ${domains.length} domains`);
+    }
+
+    createDomainCard(domain) {
+        const healthClass = domain.health.status;
+        const tlsIcon = this.getTLSIcon(domain.tlsConfig);
+        const backendIcon = domain.backend.type === 'docker' ? '🐳' : '🌐';
+        
+        return `
+            <div class="domain-card ${healthClass}" data-domain="${domain.domain}">
+                <div class="domain-header">
+                    <div class="domain-info">
+                        <div class="domain-title">
+                            ${tlsIcon} ${domain.domain}
+                            <span class="status-badge ${healthClass}">${domain.health.status.toUpperCase()}</span>
+                        </div>
+                        <div class="domain-subtitle">
+                            ${backendIcon} ${domain.backend.type === 'docker' ? domain.backend.containerName : domain.backend.hostname || domain.backend.url}
+                        </div>
+                    </div>
+                    <div class="domain-actions">
+                        <button class="btn btn-sm btn-secondary" onclick="ui.viewDomainDetails('${domain.domain}')">
+                            📋 Details
+                        </button>
+                        <button class="btn btn-sm btn-primary" onclick="ui.editDomainRoute('${domain.routerName}')">
+                            ✏️ Edit
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="domain-details">
+                    <div class="detail-section">
+                        <div class="detail-label">🔒 TLS:</div>
+                        <div class="detail-value">${this.formatTLSConfig(domain.tlsConfig)}</div>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-label">🛡️ Middleware:</div>
+                        <div class="detail-value">${domain.middlewares.length ? domain.middlewares.join(', ') : 'None'}</div>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-label">📍 Backend:</div>
+                        <div class="detail-value">${this.formatBackend(domain.backend)}</div>
+                    </div>
+                    <div class="detail-section">
+                        <div class="detail-label">⚡ Status:</div>
+                        <div class="detail-value">${this.formatHealthStatus(domain.health)}</div>
+                    </div>
+                </div>
+                
+                ${domain.health.issues.length > 0 ? `
+                <div class="domain-issues">
+                    <h4>⚠️ Issues</h4>
+                    <ul>
+                        ${domain.health.issues.map(issue => `<li>${issue}</li>`).join('')}
+                    </ul>
+                </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    getTLSIcon(tlsConfig) {
+        if (!tlsConfig.enabled) return '🔓';
+        switch (tlsConfig.type) {
+            case 'letsencrypt-http':
+            case 'letsencrypt-dns':
+                return '🔒';
+            case 'letsencrypt-staging':
+                return '🔒🧪';
+            case 'custom':
+                return '🔒📜';
+            default:
+                return '🔒❓';
+        }
+    }
+
+    formatTLSConfig(tlsConfig) {
+        if (!tlsConfig.enabled) return 'Disabled';
+        switch (tlsConfig.type) {
+            case 'letsencrypt-http':
+                return 'Let\'s Encrypt HTTP';
+            case 'letsencrypt-dns':
+                return 'Let\'s Encrypt DNS';
+            case 'letsencrypt-staging':
+                return 'Let\'s Encrypt Staging';
+            case 'custom':
+                return 'Custom Certificate';
+            default:
+                return 'Unknown';
+        }
+    }
+
+    formatBackend(backend) {
+        switch (backend.type) {
+            case 'docker':
+                return `Docker: ${backend.containerName}:${backend.port}`;
+            case 'external':
+                return `External: ${backend.hostname}:${backend.port}`;
+            default:
+                return backend.url || 'Unknown';
+        }
+    }
+
+    formatHealthStatus(health) {
+        const lastChecked = new Date(health.lastChecked).toLocaleTimeString();
+        return `${health.status} (checked ${lastChecked})`;
+    }
+
+    filterDomains(filter) {
+        if (!this.allDomains) return;
+        
+        const cards = document.querySelectorAll('.domain-card');
+        let visibleCount = 0;
+        
+        cards.forEach(card => {
+            let show = true;
+            const domain = this.allDomains.find(d => d.domain === card.dataset.domain);
+            
+            if (!domain) {
+                show = false;
+            } else {
+                switch (filter) {
+                    case 'healthy':
+                        show = domain.health.status === 'healthy';
+                        break;
+                    case 'warning':
+                        show = domain.health.status === 'warning';
+                        break;
+                    case 'error':
+                        show = domain.health.status === 'error';
+                        break;
+                    case 'external':
+                        show = domain.backend.type === 'external';
+                        break;
+                    case 'docker':
+                        show = domain.backend.type === 'docker';
+                        break;
+                    case 'all':
+                    default:
+                        show = true;
+                        break;
+                }
+            }
+            
+            if (show) {
+                card.style.display = 'block';
+                visibleCount++;
+            } else {
+                card.style.display = 'none';
+            }
+        });
+        
+        const statusText = visibleCount === cards.length 
+            ? `Showing all ${cards.length} domains`
+            : `Showing ${visibleCount} of ${cards.length} domains`;
+        this.updateFilterStatus('domain', statusText);
+    }
+
+    displayNetworkTopologyMap(domains) {
+        const container = document.getElementById('network-topology-map');
+        
+        if (domains.length === 0) {
+            container.innerHTML = '<p>No topology data available.</p>';
+            return;
+        }
+
+        // Group domains by backend type
+        const dockerDomains = domains.filter(d => d.backend.type === 'docker');
+        const externalDomains = domains.filter(d => d.backend.type === 'external');
+        
+        let html = '<div class="topology-sections">';
+        
+        if (dockerDomains.length > 0) {
+            html += `
+                <div class="topology-section">
+                    <h3>🐳 Docker Services</h3>
+                    <div class="topology-flow">
+                        ${dockerDomains.map(domain => `
+                            <div class="topology-item">
+                                <div class="topology-domain">${domain.domain}</div>
+                                <div class="topology-arrow">→</div>
+                                <div class="topology-container">${domain.backend.containerName}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (externalDomains.length > 0) {
+            html += `
+                <div class="topology-section">
+                    <h3>🌐 External Services</h3>
+                    <div class="topology-flow">
+                        ${externalDomains.map(domain => `
+                            <div class="topology-item">
+                                <div class="topology-domain">${domain.domain}</div>
+                                <div class="topology-arrow">→</div>
+                                <div class="topology-external">${domain.backend.hostname || domain.backend.url}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    async viewDomainDetails(domain) {
+        try {
+            const response = await fetch(`/api/domains/${encodeURIComponent(domain)}`);
+            if (!response.ok) {
+                throw new Error('Failed to get domain details');
+            }
+            
+            const details = await response.json();
+            this.showDomainDetailsModal(details);
+        } catch (error) {
+            this.showNotification(`Failed to get details for ${domain}`, 'error');
+        }
+    }
+
+    showDomainDetailsModal(details) {
+        const modal = document.createElement('div');
+        modal.className = 'modal domain-details-modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>🌐 ${details.domain} - Detailed Analysis</h3>
+                    <button class="modal-close" onclick="this.closest('.modal').remove()">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="details-grid">
+                        <div class="detail-card">
+                            <h4>🔒 TLS Configuration</h4>
+                            <pre>${JSON.stringify(details.tlsDetails, null, 2)}</pre>
+                        </div>
+                        <div class="detail-card">
+                            <h4>📍 Backend Details</h4>
+                            <pre>${JSON.stringify(details.backendDetails, null, 2)}</pre>
+                        </div>
+                        <div class="detail-card">
+                            <h4>🛡️ Middleware Chain</h4>
+                            <pre>${JSON.stringify(details.middlewareDetails, null, 2)}</pre>
+                        </div>
+                        <div class="detail-card">
+                            <h4>🌐 Network Path</h4>
+                            <pre>${JSON.stringify(details.networkPath, null, 2)}</pre>
+                        </div>
+                        <div class="detail-card">
+                            <h4>⚙️ Router Configuration</h4>
+                            <pre>${JSON.stringify(details.routerConfig, null, 2)}</pre>
+                        </div>
+                        <div class="detail-card">
+                            <h4>🔧 Service Configuration</h4>
+                            <pre>${JSON.stringify(details.serviceConfig, null, 2)}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+    }
+
+    editDomainRoute(routerName) {
+        // Switch to add-route tab and populate with existing data
+        this.switchTab('add-route');
+        this.showNotification(`Editing ${routerName} (populate form functionality pending)`, 'info');
     }
 }
 
