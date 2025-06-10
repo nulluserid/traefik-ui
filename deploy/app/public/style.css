@@ -279,6 +279,51 @@ h1 {
     }
 }
 
+/* Navigation Menu System */
+.main-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 30px;
+    margin-bottom: 30px;
+    padding: 20px;
+    background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 150px;
+}
+
+.nav-group-label {
+    font-size: 0.9em;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: var(--bg-tertiary);
+    border-left: 3px solid var(--accent-color);
+}
+
+/* Cyberpunk nav group styling */
+[data-theme="dark"] .nav-group-label {
+    background: linear-gradient(135deg, var(--bg-tertiary), rgba(0,255,255,0.05));
+    text-shadow: 0 0 5px var(--accent-color);
+    border-left: 3px solid var(--neon-cyan);
+}
+
+@media (prefers-color-scheme: dark) {
+    .nav-group-label {
+        background: linear-gradient(135deg, var(--bg-tertiary), rgba(0,255,255,0.05));
+        text-shadow: 0 0 5px var(--accent-color);
+        border-left: 3px solid var(--neon-cyan);
+    }
+}
+
 .tabs {
     display: flex;
     margin-bottom: 30px;
@@ -290,15 +335,17 @@ h1 {
 
 .tab-btn {
     background: none;
-    border: none;
-    padding: 12px 24px;
+    border: 1px solid transparent;
+    padding: 8px 16px;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 14px;
     color: var(--text-primary);
-    border-bottom: 3px solid transparent;
+    border-radius: 6px;
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
+    text-align: left;
+    width: 100%;
 }
 
 .tab-btn:hover {
@@ -308,8 +355,9 @@ h1 {
 
 .tab-btn.active {
     color: var(--accent-color);
-    border-bottom-color: var(--accent-color);
+    border: 1px solid var(--accent-color);
     background: linear-gradient(135deg, rgba(0,255,255,0.1), rgba(168,85,247,0.1));
+    font-weight: 600;
 }
 
 /* Cyberpunk tab glow effect */
@@ -506,6 +554,35 @@ h1 {
     text-shadow: 0 0 5px rgba(0,0,0,0.5);
 }
 
+/* Better contrast for primary buttons in dark mode */
+[data-theme="dark"] .btn-primary {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    color: var(--neon-cyan);
+    border: 1px solid var(--neon-cyan);
+    text-shadow: 0 0 5px rgba(0,255,255,0.3);
+}
+
+[data-theme="dark"] .btn-primary:hover {
+    background: linear-gradient(135deg, #16213e, #0f3460);
+    box-shadow: 0 0 20px rgba(0,255,255,0.4);
+    color: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+    .btn-primary {
+        background: linear-gradient(135deg, #1a1a2e, #16213e);
+        color: var(--neon-cyan);
+        border: 1px solid var(--neon-cyan);
+        text-shadow: 0 0 5px rgba(0,255,255,0.3);
+    }
+    
+    .btn-primary:hover {
+        background: linear-gradient(135deg, #16213e, #0f3460);
+        box-shadow: 0 0 20px rgba(0,255,255,0.4);
+        color: #ffffff;
+    }
+}
+
 .btn-primary:hover {
     background: linear-gradient(135deg, var(--accent-hover), #007aa3);
     box-shadow: var(--shadow-neon-hover);
@@ -664,14 +741,65 @@ h1 {
 
 .notification.success {
     background-color: var(--success-color);
+    color: #000000;
+    font-weight: 600;
 }
 
 .notification.error {
     background-color: var(--danger-color);
+    color: #ffffff;
+    font-weight: 600;
 }
 
 .notification.info {
     background-color: var(--accent-color);
+    color: #000000;
+    font-weight: 600;
+}
+
+/* Better notification contrast in dark mode */
+[data-theme="dark"] .notification.success {
+    background: linear-gradient(135deg, #1a2e1a, #0d4f0d);
+    color: var(--neon-green);
+    border: 1px solid var(--neon-green);
+    text-shadow: 0 0 5px rgba(0,255,136,0.3);
+}
+
+[data-theme="dark"] .notification.error {
+    background: linear-gradient(135deg, #2e1a1a, #4f0d0d);
+    color: var(--neon-pink);
+    border: 1px solid var(--neon-pink);
+    text-shadow: 0 0 5px rgba(255,0,128,0.3);
+}
+
+[data-theme="dark"] .notification.info {
+    background: linear-gradient(135deg, #1a1a2e, #0d0d4f);
+    color: var(--neon-cyan);
+    border: 1px solid var(--neon-cyan);
+    text-shadow: 0 0 5px rgba(0,255,255,0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+    .notification.success {
+        background: linear-gradient(135deg, #1a2e1a, #0d4f0d);
+        color: var(--neon-green);
+        border: 1px solid var(--neon-green);
+        text-shadow: 0 0 5px rgba(0,255,136,0.3);
+    }
+
+    .notification.error {
+        background: linear-gradient(135deg, #2e1a1a, #4f0d0d);
+        color: var(--neon-pink);
+        border: 1px solid var(--neon-pink);
+        text-shadow: 0 0 5px rgba(255,0,128,0.3);
+    }
+
+    .notification.info {
+        background: linear-gradient(135deg, #1a1a2e, #0d0d4f);
+        color: var(--neon-cyan);
+        border: 1px solid var(--neon-cyan);
+        text-shadow: 0 0 5px rgba(0,255,255,0.3);
+    }
 }
 
 .notification.hidden {
@@ -1278,6 +1406,15 @@ h1 {
     
     .templates-grid {
         grid-template-columns: 1fr;
+    }
+    
+    .main-nav {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .nav-group {
+        min-width: 100%;
     }
     
     .tabs {

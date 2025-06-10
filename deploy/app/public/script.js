@@ -222,6 +222,9 @@ class TraefikUI {
         const serviceName = `${routeName}-service`;
         
         try {
+            // Check if backend URL points to a Docker container and validate network connectivity
+            await this.validateNetworkConnectivity(backendUrl);
+            
             await this.createService(serviceName, backendUrl, { ignoreTlsErrors });
             
             const routeConfig = {
@@ -1012,11 +1015,17 @@ networks:
     }
 
     async refreshServices() {
+        // Only refresh if we already have scanned once
+        if (!this.discoveredServices || this.discoveredServices.length === 0) {
+            this.showNotification('Click "Scan for Services" first to discover containers', 'info');
+            return;
+        }
         await this.scanDockerServices();
     }
 
     displayDiscoveredServices(services) {
         const container = document.getElementById('discovered-services');
+        this.discoveredServices = services; // Store for refresh functionality
         
         if (services.length === 0) {
             container.innerHTML = '<p>No Docker containers found.</p>';
@@ -1303,6 +1312,11 @@ networks:
     }
 
     async refreshNetworks() {
+        // Only refresh if we already have scanned once
+        if (!this.allNetworks || this.allNetworks.length === 0) {
+            this.showNotification('Click "Scan Networks" first to discover networks', 'info');
+            return;
+        }
         await this.scanNetworks();
     }
 
@@ -1573,6 +1587,141 @@ networks:
         
         html += '</div>';
         container.innerHTML = html;
+    }
+
+    // Network validation for route creation
+    async validateNetworkConnectivity(backendUrl) {
+        // Extract hostname from backend URL (e.g., http://container-name:port)
+        let hostname;
+        try {
+            const url = new URL(backendUrl);
+            hostname = url.hostname;
+        } catch (error) {
+            // Not a valid URL, might be IP or hostname
+            hostname = backendUrl.split(':')[0];
+        }
+        
+        // Check if hostname looks like a Docker container name (not an IP address)
+        const isDockerContainer = !/^\d+\.\d+\.\d+\.\d+$/.test(hostname) && 
+                                 !hostname.includes('.') && 
+                                 hostname !== 'localhost' &&
+                                 hostname !== '127.0.0.1';
+        
+        if (!isDockerContainer) {
+            return; // External service, no validation needed
+        }
+        
+        try {
+            // Get current network topology and Traefik connections
+            const [networkResponse, managementResponse] = await Promise.all([
+                fetch('/api/networks/topology'),
+                fetch('/api/networks/management')
+            ]);
+            
+            const topology = await networkResponse.json();
+            const management = await managementResponse.json();
+            
+            // Find networks containing the target container
+            const containerNetworks = [];
+            topology.networks.forEach(network => {
+                const container = network.containers.find(c => 
+                    c.name === hostname || c.name.includes(hostname)
+                );
+                if (container) {
+                    containerNetworks.push(network.name);
+                }
+            });
+            
+            if (containerNetworks.length === 0) {
+                this.showNotification(`Container '${hostname}' not found in any Docker network`, 'error');
+                throw new Error(`Container not found: ${hostname}`);
+            }
+            
+            // Check if Traefik is connected to any of these networks
+            const traefikNetworks = management.traefikNetworks;
+            const connectedNetworks = containerNetworks.filter(net => traefikNetworks.includes(net));
+            
+            if (connectedNetworks.length === 0) {
+                // Traefik is not connected to any network containing this container
+                const networkToConnect = containerNetworks[0]; // Suggest the first network
+                
+                const shouldConnect = await this.askToConnectNetwork(hostname, networkToConnect, containerNetworks);
+                if (!shouldConnect) {
+                    throw new Error('Route creation cancelled: Network connectivity required');
+                }
+            } else {
+                this.showNotification(`✅ Network connectivity validated: ${connectedNetworks.join(', ')}`, 'success');
+            }
+            
+        } catch (error) {
+            if (error.message.includes('cancelled')) {
+                throw error;
+            }
+            console.warn('Network validation failed:', error);
+            // Continue anyway - might be an external service or validation error
+        }
+    }
+    
+    async askToConnectNetwork(containerName, suggestedNetwork, allNetworks) {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Network Connection Required</h3>
+                    </div>
+                    <div class="modal-body">
+                        <p><strong>Warning:</strong> Traefik is not connected to any network containing the container '<strong>${containerName}</strong>'.</p>
+                        <p>Available networks for this container:</p>
+                        <ul>
+                            ${allNetworks.map(net => `<li><strong>${net}</strong></li>`).join('')}
+                        </ul>
+                        <p>Would you like to connect Traefik to the <strong>${suggestedNetwork}</strong> network?</p>
+                        <div class="modal-actions">
+                            <button id="connect-and-continue" class="btn btn-primary">Connect & Continue</button>
+                            <button id="continue-anyway" class="btn btn-warning">Continue Anyway</button>
+                            <button id="cancel-route" class="btn btn-secondary">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            document.getElementById('connect-and-continue').onclick = async () => {
+                modal.remove();
+                try {
+                    // Connect to the suggested network
+                    const networks = await fetch('/api/networks/management').then(r => r.json());
+                    const targetNetwork = networks.networks.find(n => n.name === suggestedNetwork);
+                    
+                    if (targetNetwork) {
+                        await fetch(`/api/networks/${targetNetwork.id}/connect`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({})
+                        });
+                        this.showNotification(`Connected Traefik to ${suggestedNetwork}`, 'success');
+                    }
+                    resolve(true);
+                } catch (error) {
+                    this.showNotification(`Failed to connect to network: ${error.message}`, 'error');
+                    resolve(false);
+                }
+            };
+            
+            document.getElementById('continue-anyway').onclick = () => {
+                modal.remove();
+                this.showNotification('⚠️ Proceeding without network validation', 'warning');
+                resolve(true);
+            };
+            
+            document.getElementById('cancel-route').onclick = () => {
+                modal.remove();
+                resolve(false);
+            };
+        });
     }
 }
 
