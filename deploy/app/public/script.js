@@ -742,16 +742,20 @@ class TraefikUI {
         // Populate middleware
         try {
             const response = await fetch('/api/middleware');
-            const middleware = await response.json();
+            const data = await response.json();
             const select = document.getElementById('label-middleware-select');
             
             select.innerHTML = '';
-            middleware.forEach(mw => {
-                const option = document.createElement('option');
-                option.value = mw.name;
-                option.textContent = mw.name;
-                select.appendChild(option);
-            });
+            
+            // Handle the middleware object structure
+            if (data.middlewares) {
+                Object.keys(data.middlewares).forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    select.appendChild(option);
+                });
+            }
         } catch (error) {
             console.error('Failed to load middleware for label generator:', error);
         }
