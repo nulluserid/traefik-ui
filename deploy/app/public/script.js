@@ -2480,43 +2480,383 @@ scrape_timeout: 10s`;
         const modal = document.createElement('div');
         modal.className = 'modal domain-details-modal';
         modal.innerHTML = `
-            <div class="modal-content">
+            <div class="modal-content large-modal">
                 <div class="modal-header">
-                    <h3>🌐 ${details.domain} - Detailed Analysis</h3>
-                    <button class="modal-close" onclick="this.closest('.modal').remove()">×</button>
+                    <h3>🌐 ${details.domain} - Complete Analysis</h3>
+                    <div class="modal-controls">
+                        <button id="refresh-domain-details" class="btn btn-sm btn-secondary">🔄 Refresh</button>
+                        <button id="test-domain-connectivity" class="btn btn-sm btn-primary">🧪 Test</button>
+                        <button class="modal-close" onclick="this.closest('.modal').remove()">×</button>
+                    </div>
                 </div>
                 <div class="modal-body">
-                    <div class="details-grid">
-                        <div class="detail-card">
-                            <h4>🔒 TLS Configuration</h4>
-                            <pre>${JSON.stringify(details.tlsDetails, null, 2)}</pre>
+                    <div class="domain-overview-tabs">
+                        <button class="domain-tab-btn active" data-tab="overview">Overview</button>
+                        <button class="domain-tab-btn" data-tab="observability">Observability</button>
+                        <button class="domain-tab-btn" data-tab="configuration">Configuration</button>
+                        <button class="domain-tab-btn" data-tab="health">Health & Testing</button>
+                    </div>
+                    
+                    <div id="overview-tab" class="domain-tab-content active">
+                        <div class="domain-summary-grid">
+                            <div class="summary-card">
+                                <h4>🔒 TLS Status</h4>
+                                <div class="tls-summary">
+                                    ${this.formatTLSConfig(details.tlsDetails || {})}
+                                </div>
+                            </div>
+                            <div class="summary-card">
+                                <h4>📍 Backend</h4>
+                                <div class="backend-summary">
+                                    ${this.formatBackend(details.backend)}
+                                </div>
+                            </div>
+                            <div class="summary-card">
+                                <h4>🌐 Network Path</h4>
+                                <div class="network-summary">
+                                    ${details.networkPath?.connected ? '✅ Connected' : '⚠️ Connection Issues'}
+                                    <br><small>${details.networkPath?.commonNetworks?.length || 0} shared networks</small>
+                                </div>
+                            </div>
+                            <div class="summary-card">
+                                <h4>🛡️ Protection</h4>
+                                <div class="middleware-summary">
+                                    ${details.middlewareDetails?.length || 0} middleware active
+                                    <br><small>${details.middlewareDetails?.map(m => m.name).join(', ') || 'None'}</small>
+                                </div>
+                            </div>
                         </div>
-                        <div class="detail-card">
-                            <h4>📍 Backend Details</h4>
-                            <pre>${JSON.stringify(details.backendDetails, null, 2)}</pre>
-                        </div>
-                        <div class="detail-card">
-                            <h4>🛡️ Middleware Chain</h4>
-                            <pre>${JSON.stringify(details.middlewareDetails, null, 2)}</pre>
-                        </div>
-                        <div class="detail-card">
-                            <h4>🌐 Network Path</h4>
-                            <pre>${JSON.stringify(details.networkPath, null, 2)}</pre>
-                        </div>
-                        <div class="detail-card">
-                            <h4>⚙️ Router Configuration</h4>
-                            <pre>${JSON.stringify(details.routerConfig, null, 2)}</pre>
-                        </div>
-                        <div class="detail-card">
-                            <h4>🔧 Service Configuration</h4>
-                            <pre>${JSON.stringify(details.serviceConfig, null, 2)}</pre>
+                        
+                        <div class="routing-flow">
+                            <h4>📈 Request Flow</h4>
+                            <div class="flow-diagram">
+                                <div class="flow-step">
+                                    <span class="flow-icon">🌐</span>
+                                    <span class="flow-label">Client</span>
+                                </div>
+                                <div class="flow-arrow">→</div>
+                                <div class="flow-step">
+                                    <span class="flow-icon">🔀</span>
+                                    <span class="flow-label">Traefik<br><small>${details.routerName}</small></span>
+                                </div>
+                                <div class="flow-arrow">→</div>
+                                <div class="flow-step">
+                                    <span class="flow-icon">${details.backend?.type === 'docker' ? '🐳' : '🌐'}</span>
+                                    <span class="flow-label">${details.backend?.type === 'docker' ? 'Container' : 'External'}<br><small>${details.serviceName}</small></span>
+                                </div>
+                            </div>
                         </div>
                     </div>
+                    
+                    <div id="observability-tab" class="domain-tab-content">
+                        <div class="observability-grid">
+                            <div class="obs-card">
+                                <h4>📊 Performance Metrics</h4>
+                                <div id="domain-metrics-${details.domain.replace(/\./g, '-')}">Loading metrics...</div>
+                            </div>
+                            <div class="obs-card">
+                                <h4>🔍 Recent Traces</h4>
+                                <div id="domain-traces-${details.domain.replace(/\./g, '-')}">Loading traces...</div>
+                            </div>
+                            <div class="obs-card">
+                                <h4>⚡ Real-time Health</h4>
+                                <div id="domain-health-${details.domain.replace(/\./g, '-')}">Loading health data...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="configuration-tab" class="domain-tab-content">
+                        <div class="config-grid">
+                            <div class="config-card">
+                                <h4>⚙️ Router Configuration</h4>
+                                <pre class="config-json">${JSON.stringify(details.routerConfig, null, 2)}</pre>
+                            </div>
+                            <div class="config-card">
+                                <h4>🔧 Service Configuration</h4>
+                                <pre class="config-json">${JSON.stringify(details.serviceConfig, null, 2)}</pre>
+                            </div>
+                            <div class="config-card">
+                                <h4>🛡️ Middleware Details</h4>
+                                <pre class="config-json">${JSON.stringify(details.middlewareDetails, null, 2)}</pre>
+                            </div>
+                            <div class="config-card">
+                                <h4>🌐 Network Details</h4>
+                                <pre class="config-json">${JSON.stringify(details.networkPath, null, 2)}</pre>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="health-tab" class="domain-tab-content">
+                        <div class="health-grid">
+                            <div class="health-card">
+                                <h4>🏥 Health Status</h4>
+                                <div id="health-status-display">
+                                    <div class="health-indicator ${details.health?.status || 'unknown'}">
+                                        <span class="status-icon">${this.getHealthIcon(details.health?.status)}</span>
+                                        <span class="status-text">${details.health?.status || 'Unknown'}</span>
+                                    </div>
+                                    ${details.health?.issues?.length ? `
+                                        <div class="health-issues">
+                                            <h5>Issues:</h5>
+                                            <ul>
+                                                ${details.health.issues.map(issue => `<li>${issue}</li>`).join('')}
+                                            </ul>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            <div class="health-card">
+                                <h4>🧪 Connectivity Tests</h4>
+                                <div class="test-controls">
+                                    <button onclick="ui.testDomainConnectivity('${details.domain}', 'connectivity')" class="btn btn-sm btn-primary">Test Connectivity</button>
+                                    <button onclick="ui.testDomainConnectivity('${details.domain}', 'network')" class="btn btn-sm btn-secondary">Test Network</button>
+                                    <button onclick="ui.testDomainConnectivity('${details.domain}', 'health')" class="btn btn-sm btn-secondary">Health Check</button>
+                                </div>
+                                <div id="test-results-${details.domain.replace(/\./g, '-')}" class="test-results"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="ui.editDomainRoute('${details.domain}')" class="btn btn-primary">✏️ Edit Route</button>
+                    <button onclick="this.closest('.modal').remove()" class="btn btn-secondary">Close</button>
                 </div>
             </div>
         `;
         
         document.body.appendChild(modal);
+        
+        // Setup tab switching
+        modal.querySelectorAll('.domain-tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                modal.querySelectorAll('.domain-tab-btn').forEach(b => b.classList.remove('active'));
+                modal.querySelectorAll('.domain-tab-content').forEach(t => t.classList.remove('active'));
+                btn.classList.add('active');
+                modal.getElementById(btn.dataset.tab + '-tab').classList.add('active');
+                
+                // Load observability data when tab is opened
+                if (btn.dataset.tab === 'observability') {
+                    this.loadDomainObservabilityData(details.domain);
+                }
+            });
+        });
+        
+        // Setup event listeners
+        modal.getElementById('refresh-domain-details').addEventListener('click', () => {
+            modal.remove();
+            this.viewDomainDetails(details.domain);
+        });
+        
+        modal.getElementById('test-domain-connectivity').addEventListener('click', () => {
+            this.testDomainConnectivity(details.domain, 'connectivity');
+        });
+    }
+
+    async loadDomainObservabilityData(domain) {
+        try {
+            // Load metrics, traces, and health data in parallel
+            const [metricsResponse, tracesResponse, healthResponse] = await Promise.all([
+                fetch(`/api/domains/metrics?domain=${encodeURIComponent(domain)}`),
+                fetch(`/api/domains/${encodeURIComponent(domain)}/traces?limit=5`),
+                fetch(`/api/domains/${encodeURIComponent(domain)}/health`)
+            ]);
+
+            const domainSafe = domain.replace(/\./g, '-');
+
+            // Display metrics
+            if (metricsResponse.ok) {
+                const metrics = await metricsResponse.json();
+                const metricsDiv = document.getElementById(`domain-metrics-${domainSafe}`);
+                if (metricsDiv) {
+                    const domainMetrics = metrics.domains?.find(d => d.domain === domain);
+                    if (domainMetrics) {
+                        metricsDiv.innerHTML = `
+                            <div class="metrics-grid">
+                                <div class="metric-item">
+                                    <span class="metric-label">Requests</span>
+                                    <span class="metric-value">${domainMetrics.requests}</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Avg Response</span>
+                                    <span class="metric-value">${domainMetrics.averageResponseTime}ms</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Error Rate</span>
+                                    <span class="metric-value">${(domainMetrics.errorRate * 100).toFixed(2)}%</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Uptime</span>
+                                    <span class="metric-value">${domainMetrics.uptime}%</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Requests/min</span>
+                                    <span class="metric-value">${domainMetrics.metrics.requestsPerMinute}</span>
+                                </div>
+                                <div class="metric-item">
+                                    <span class="metric-label">Data Transfer</span>
+                                    <span class="metric-value">${(domainMetrics.metrics.bytesTransferred / 1024 / 1024).toFixed(1)}MB</span>
+                                </div>
+                            </div>
+                            <div class="top-paths">
+                                <h5>Top Paths</h5>
+                                ${domainMetrics.metrics.topPaths.map(path => `
+                                    <div class="path-item">
+                                        <span class="path-url">${path.path}</span>
+                                        <span class="path-requests">${path.requests} requests</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `;
+                    } else {
+                        metricsDiv.innerHTML = '<div class="no-data">No metrics available for this domain</div>';
+                    }
+                }
+            }
+
+            // Display traces
+            if (tracesResponse.ok) {
+                const traces = await tracesResponse.json();
+                const tracesDiv = document.getElementById(`domain-traces-${domainSafe}`);
+                if (tracesDiv) {
+                    tracesDiv.innerHTML = `
+                        <div class="traces-summary">
+                            <div class="trace-metrics">
+                                <span class="trace-stat">Total: ${traces.totalTraces}</span>
+                                <span class="trace-stat">Avg: ${traces.metrics.averageResponseTime}ms</span>
+                                <span class="trace-stat">Error: ${(traces.metrics.errorRate * 100).toFixed(1)}%</span>
+                                <span class="trace-stat">P95: ${traces.metrics.percentiles.p95}ms</span>
+                            </div>
+                        </div>
+                        <div class="traces-list">
+                            ${traces.traces.map(trace => `
+                                <div class="trace-item ${trace.status}">
+                                    <div class="trace-header">
+                                        <span class="trace-method">${trace.method}</span>
+                                        <span class="trace-path">${trace.path}</span>
+                                        <span class="trace-status ${trace.status}">${trace.statusCode}</span>
+                                        <span class="trace-duration">${trace.duration}ms</span>
+                                    </div>
+                                    <div class="trace-details">
+                                        <small>${new Date(trace.timestamp).toLocaleString()}</small>
+                                        <small>Spans: ${trace.spans.length}</small>
+                                        <small>ID: ${trace.traceId}</small>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+            }
+
+            // Display health data
+            if (healthResponse.ok) {
+                const health = await healthResponse.json();
+                const healthDiv = document.getElementById(`domain-health-${domainSafe}`);
+                if (healthDiv) {
+                    healthDiv.innerHTML = `
+                        <div class="health-summary">
+                            <div class="health-indicator ${health.health.status}">
+                                <span class="status-icon">${this.getHealthIcon(health.health.status)}</span>
+                                <span class="status-text">${health.health.status}</span>
+                            </div>
+                            <div class="health-metrics">
+                                ${health.health.metrics ? `
+                                    <div class="health-metric">
+                                        <span>Last Check:</span>
+                                        <span>${new Date(health.health.lastChecked).toLocaleString()}</span>
+                                    </div>
+                                    ${health.health.metrics.responseTime ? `
+                                        <div class="health-metric">
+                                            <span>Response Time:</span>
+                                            <span>${health.health.metrics.responseTime}ms</span>
+                                        </div>
+                                    ` : ''}
+                                    ${health.health.metrics.uptime ? `
+                                        <div class="health-metric">
+                                            <span>Uptime:</span>
+                                            <span>${Math.floor(health.health.metrics.uptime / 60)} minutes</span>
+                                        </div>
+                                    ` : ''}
+                                ` : ''}
+                            </div>
+                            ${health.health.issues.length ? `
+                                <div class="health-issues">
+                                    <h5>Issues:</h5>
+                                    <ul>
+                                        ${health.health.issues.map(issue => `<li>${issue}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+            }
+
+        } catch (error) {
+            console.error('Failed to load observability data:', error);
+            const domainSafe = domain.replace(/\./g, '-');
+            ['metrics', 'traces', 'health'].forEach(type => {
+                const div = document.getElementById(`domain-${type}-${domainSafe}`);
+                if (div) {
+                    div.innerHTML = `<div class="error">Failed to load ${type} data</div>`;
+                }
+            });
+        }
+    }
+
+    async testDomainConnectivity(domain, testType) {
+        try {
+            const response = await fetch(`/api/domains/${encodeURIComponent(domain)}/test`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ testType })
+            });
+
+            const results = await response.json();
+            const domainSafe = domain.replace(/\./g, '-');
+            const resultsDiv = document.getElementById(`test-results-${domainSafe}`);
+            
+            if (resultsDiv) {
+                const resultHtml = Object.entries(results.results).map(([key, result]) => `
+                    <div class="test-result ${result.status}">
+                        <div class="test-header">
+                            <span class="test-name">${key}</span>
+                            <span class="test-status ${result.status}">${result.status}</span>
+                        </div>
+                        <div class="test-message">${result.message}</div>
+                        ${result.details ? `
+                            <div class="test-details">
+                                <pre>${JSON.stringify(result.details, null, 2)}</pre>
+                            </div>
+                        ` : ''}
+                        ${result.error ? `
+                            <div class="test-error">Error: ${result.error}</div>
+                        ` : ''}
+                    </div>
+                `).join('');
+
+                resultsDiv.innerHTML = `
+                    <div class="test-results-header">
+                        <h5>Test Results - ${testType}</h5>
+                        <small>${new Date(results.timestamp).toLocaleString()}</small>
+                    </div>
+                    ${resultHtml}
+                `;
+            }
+
+            this.showNotification(`${testType} test completed for ${domain}`, 'success');
+        } catch (error) {
+            this.showNotification(`Failed to test ${domain}`, 'error');
+        }
+    }
+
+    getHealthIcon(status) {
+        switch (status) {
+            case 'healthy': return '✅';
+            case 'warning': return '⚠️';
+            case 'error': return '❌';
+            default: return '❓';
+        }
     }
 
     editDomainRoute(routerName) {

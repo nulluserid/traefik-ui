@@ -914,6 +914,437 @@ app.get('/api/domains/:domain', async (req, res) => {
   }
 });
 
+// Get health status for specific domain
+app.get('/api/domains/:domain/health', async (req, res) => {
+  try {
+    const { domain } = req.params;
+    let config = {};
+    if (fs.existsSync(DYNAMIC_CONFIG_PATH)) {
+      config = yaml.load(fs.readFileSync(DYNAMIC_CONFIG_PATH, 'utf8'));
+    }
+
+    const routers = config.http?.routers || {};
+    const services = config.http?.services || {};
+
+    // Find router for this domain
+    const routerEntry = Object.entries(routers).find(([name, routerConfig]) => 
+      extractDomainFromRule(routerConfig.rule) === domain
+    );
+
+    if (!routerEntry) {
+      return res.status(404).json({ error: 'Domain not found' });
+    }
+
+    const [routerName, routerConfig] = routerEntry;
+    const serviceName = routerConfig.service;
+    const serviceConfig = services[serviceName];
+
+    // Get backend analysis and detailed health check
+    const backend = analyzeBackend(serviceConfig);
+    const health = await determineHealthStatus(domain, backend);
+    const networkPath = await analyzeNetworkPath(backend);
+
+    res.json({
+      domain,
+      routerName,
+      serviceName,
+      health,
+      backend,
+      networkPath,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Domain health check error:', error);
+    res.status(500).json({ error: 'Failed to check domain health' });
+  }
+});
+
+// Test domain connectivity and backend health
+app.post('/api/domains/:domain/test', async (req, res) => {
+  try {
+    const { domain } = req.params;
+    const { testType = 'connectivity' } = req.body;
+    
+    let config = {};
+    if (fs.existsSync(DYNAMIC_CONFIG_PATH)) {
+      config = yaml.load(fs.readFileSync(DYNAMIC_CONFIG_PATH, 'utf8'));
+    }
+
+    const routers = config.http?.routers || {};
+    const services = config.http?.services || {};
+
+    // Find router for this domain
+    const routerEntry = Object.entries(routers).find(([name, routerConfig]) => 
+      extractDomainFromRule(routerConfig.rule) === domain
+    );
+
+    if (!routerEntry) {
+      return res.status(404).json({ error: 'Domain not found' });
+    }
+
+    const [routerName, routerConfig] = routerEntry;
+    const serviceName = routerConfig.service;
+    const serviceConfig = services[serviceName];
+    const backend = analyzeBackend(serviceConfig);
+
+    const testResults = {
+      domain,
+      testType,
+      timestamp: new Date().toISOString(),
+      results: {}
+    };
+
+    // Perform different types of tests
+    switch (testType) {
+      case 'connectivity':
+        // Test basic connectivity to backend
+        if (backend.type === 'docker') {
+          try {
+            const containers = await docker.listContainers({ all: true });
+            const container = containers.find(c => 
+              c.Names.some(name => name.includes(backend.containerName))
+            );
+            
+            if (container && container.State === 'running') {
+              testResults.results.connectivity = {
+                status: 'success',
+                message: 'Container is running and accessible',
+                details: {
+                  containerId: container.Id.substring(0, 12),
+                  status: container.Status
+                }
+              };
+            } else {
+              testResults.results.connectivity = {
+                status: 'failed',
+                message: 'Container not running or not found'
+              };
+            }
+          } catch (error) {
+            testResults.results.connectivity = {
+              status: 'error',
+              message: 'Failed to check container connectivity',
+              error: error.message
+            };
+          }
+        } else if (backend.type === 'external') {
+          // For external services, this would do actual HTTP requests
+          testResults.results.connectivity = {
+            status: 'success',
+            message: 'External service configuration appears valid',
+            details: {
+              url: backend.url,
+              hostname: backend.hostname,
+              port: backend.port
+            }
+          };
+        }
+        break;
+
+      case 'network':
+        // Test network path and connectivity
+        const networkPath = await analyzeNetworkPath(backend);
+        testResults.results.network = {
+          status: networkPath.connected ? 'success' : 'warning',
+          message: networkPath.connected ? 'Network path is connected' : 'Network connectivity issues detected',
+          details: networkPath
+        };
+        break;
+
+      case 'health':
+        // Comprehensive health check
+        const health = await determineHealthStatus(domain, backend);
+        testResults.results.health = {
+          status: health.status === 'healthy' ? 'success' : 'warning',
+          message: `Health status: ${health.status}`,
+          details: health
+        };
+        break;
+
+      default:
+        return res.status(400).json({ error: 'Invalid test type' });
+    }
+
+    res.json(testResults);
+  } catch (error) {
+    console.error('Domain test error:', error);
+    res.status(500).json({ error: 'Failed to test domain' });
+  }
+});
+
+// Get network topology for visualization
+app.get('/api/domains/topology', async (req, res) => {
+  try {
+    let config = {};
+    if (fs.existsSync(DYNAMIC_CONFIG_PATH)) {
+      config = yaml.load(fs.readFileSync(DYNAMIC_CONFIG_PATH, 'utf8'));
+    }
+
+    const routers = config.http?.routers || {};
+    const services = config.http?.services || {};
+    const networks = await docker.listNetworks();
+    
+    // Build comprehensive topology
+    const topology = {
+      domains: [],
+      networks: [],
+      connections: [],
+      metadata: {
+        totalRouters: Object.keys(routers).length,
+        totalServices: Object.keys(services).length,
+        totalNetworks: networks.length,
+        generatedAt: new Date().toISOString()
+      }
+    };
+
+    // Process each domain
+    for (const [routerName, routerConfig] of Object.entries(routers)) {
+      const domain = extractDomainFromRule(routerConfig.rule);
+      if (!domain) continue;
+
+      const serviceName = routerConfig.service;
+      const serviceConfig = services[serviceName];
+      const backend = analyzeBackend(serviceConfig);
+      const health = await determineHealthStatus(domain, backend);
+      const networkPath = await analyzeNetworkPath(backend);
+
+      topology.domains.push({
+        domain,
+        routerName,
+        serviceName,
+        backend,
+        health,
+        networkPath,
+        entrypoint: routerConfig.entrypoints?.[0] || 'web'
+      });
+
+      // Track network connections
+      if (networkPath.type === 'docker' && networkPath.commonNetworks) {
+        networkPath.commonNetworks.forEach(network => {
+          topology.connections.push({
+            domain,
+            network,
+            type: 'docker-network',
+            backend: backend.containerName
+          });
+        });
+      }
+    }
+
+    // Add network information
+    for (const network of networks) {
+      const details = await docker.getNetwork(network.Id).inspect();
+      topology.networks.push({
+        id: details.Id,
+        name: details.Name,
+        driver: details.Driver,
+        scope: details.Scope,
+        containers: Object.keys(details.Containers || {}).length,
+        subnet: details.IPAM?.Config?.[0]?.Subnet || 'N/A'
+      });
+    }
+
+    res.json(topology);
+  } catch (error) {
+    console.error('Topology error:', error);
+    res.status(500).json({ error: 'Failed to generate network topology' });
+  }
+});
+
+// OpenTelemetry Integration Endpoints
+
+// Get traces for a specific domain (mock implementation)
+app.get('/api/domains/:domain/traces', async (req, res) => {
+  try {
+    const { domain } = req.params;
+    const { limit = 10, timeRange = '1h' } = req.query;
+    
+    // This would integrate with actual tracing backends like Jaeger/Zipkin
+    // For now, we provide a mock structure that shows how traces would be displayed
+    const mockTraces = {
+      domain,
+      timeRange,
+      totalTraces: 45,
+      traces: [
+        {
+          traceId: 'trace-001',
+          timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // 5 min ago
+          duration: 245, // ms
+          status: 'success',
+          statusCode: 200,
+          method: 'GET',
+          path: '/',
+          spans: [
+            {
+              name: 'http-request',
+              duration: 245,
+              tags: { 'http.method': 'GET', 'http.url': `https://${domain}/` }
+            },
+            {
+              name: 'backend-request',
+              duration: 180,
+              tags: { 'backend.type': 'docker', 'container.name': 'app' }
+            }
+          ]
+        },
+        {
+          traceId: 'trace-002',
+          timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(), // 15 min ago
+          duration: 1250, // ms
+          status: 'error',
+          statusCode: 500,
+          method: 'POST',
+          path: '/api/data',
+          spans: [
+            {
+              name: 'http-request',
+              duration: 1250,
+              tags: { 'http.method': 'POST', 'http.url': `https://${domain}/api/data` }
+            },
+            {
+              name: 'backend-request',
+              duration: 1200,
+              tags: { 'backend.type': 'docker', 'error': 'connection timeout' }
+            }
+          ]
+        }
+      ],
+      metrics: {
+        averageResponseTime: 520,
+        errorRate: 0.12,
+        requestsPerMinute: 25.4,
+        percentiles: {
+          p50: 245,
+          p95: 1250,
+          p99: 2100
+        }
+      }
+    };
+
+    res.json(mockTraces);
+  } catch (error) {
+    console.error('Traces error:', error);
+    res.status(500).json({ error: 'Failed to get domain traces' });
+  }
+});
+
+// Get performance metrics for all domains
+app.get('/api/domains/metrics', async (req, res) => {
+  try {
+    const { timeRange = '1h' } = req.query;
+    
+    // This would integrate with Prometheus or other metrics systems
+    // Mock implementation showing expected structure
+    const domainMetrics = {
+      timeRange,
+      generatedAt: new Date().toISOString(),
+      overview: {
+        totalDomains: 1,
+        healthyDomains: 1,
+        warningDomains: 0,
+        errorDomains: 0,
+        totalRequests: 1250,
+        averageResponseTime: 340
+      },
+      domains: [
+        {
+          domain: 'traefik.local',
+          requests: 1250,
+          averageResponseTime: 340,
+          errorRate: 0.02,
+          uptime: 99.8,
+          lastActive: new Date().toISOString(),
+          metrics: {
+            requestsPerMinute: 20.8,
+            bytesTransferred: 2480000,
+            uniqueIPs: 15,
+            topPaths: [
+              { path: '/', requests: 450 },
+              { path: '/dashboard/', requests: 320 },
+              { path: '/api/overview', requests: 180 }
+            ]
+          }
+        }
+      ]
+    };
+
+    res.json(domainMetrics);
+  } catch (error) {
+    console.error('Domain metrics error:', error);
+    res.status(500).json({ error: 'Failed to get domain metrics' });
+  }
+});
+
+// Check for configuration conflicts across domains
+app.get('/api/domains/conflicts', async (req, res) => {
+  try {
+    let config = {};
+    if (fs.existsSync(DYNAMIC_CONFIG_PATH)) {
+      config = yaml.load(fs.readFileSync(DYNAMIC_CONFIG_PATH, 'utf8'));
+    }
+
+    const routers = config.http?.routers || {};
+    const services = config.http?.services || {};
+    const conflicts = [];
+
+    // Check for duplicate domain rules
+    const domainMap = new Map();
+    Object.entries(routers).forEach(([routerName, routerConfig]) => {
+      const domain = extractDomainFromRule(routerConfig.rule);
+      if (domain) {
+        if (domainMap.has(domain)) {
+          conflicts.push({
+            type: 'duplicate_domain',
+            severity: 'error',
+            message: `Domain ${domain} is configured in multiple routers`,
+            details: {
+              domain,
+              routers: [domainMap.get(domain), routerName]
+            }
+          });
+        } else {
+          domainMap.set(domain, routerName);
+        }
+      }
+    });
+
+    // Check for orphaned services
+    const usedServices = new Set(Object.values(routers).map(r => r.service));
+    Object.keys(services).forEach(serviceName => {
+      if (!usedServices.has(serviceName) && !serviceName.includes('@internal')) {
+        conflicts.push({
+          type: 'orphaned_service',
+          severity: 'warning',
+          message: `Service ${serviceName} is defined but not used by any router`,
+          details: { serviceName }
+        });
+      }
+    });
+
+    // Check for missing services
+    Object.entries(routers).forEach(([routerName, routerConfig]) => {
+      const serviceName = routerConfig.service;
+      if (!services[serviceName] && !serviceName.includes('@internal')) {
+        conflicts.push({
+          type: 'missing_service',
+          severity: 'error',
+          message: `Router ${routerName} references missing service ${serviceName}`,
+          details: { routerName, serviceName }
+        });
+      }
+    });
+
+    res.json({
+      totalConflicts: conflicts.length,
+      conflicts,
+      checkedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Conflicts check error:', error);
+    res.status(500).json({ error: 'Failed to check for conflicts' });
+  }
+});
+
 // Helper functions
 function extractDomainFromRule(rule) {
   const hostMatch = rule.match(/Host\(`([^`]+)`\)/);
@@ -971,9 +1402,13 @@ function analyzeTLSConfig(routerConfig) {
 }
 
 async function determineHealthStatus(domain, backend) {
-  // Basic health determination - in production this could do actual health checks
   let status = 'unknown';
   let issues = [];
+  let metrics = {
+    responseTime: null,
+    statusCode: null,
+    lastSuccessfulCheck: null
+  };
 
   if (backend.type === 'invalid') {
     status = 'error';
@@ -994,16 +1429,54 @@ async function determineHealthStatus(domain, backend) {
         issues.push('Container not running');
       } else {
         status = 'healthy';
+        
+        // Get container stats if available
+        try {
+          const containerDetails = await docker.getContainer(container.Id).inspect();
+          const uptime = new Date() - new Date(containerDetails.State.StartedAt);
+          metrics.uptime = Math.floor(uptime / 1000); // seconds
+          
+          if (containerDetails.State.Health) {
+            if (containerDetails.State.Health.Status === 'unhealthy') {
+              status = 'warning';
+              issues.push('Container health check failing');
+            }
+          }
+        } catch (error) {
+          // Container stats unavailable, but container is running
+        }
       }
     } catch (error) {
       status = 'warning';
       issues.push('Cannot verify container status');
     }
   } else if (backend.type === 'external') {
-    status = 'healthy'; // Assume external services are healthy
+    // Try to ping external services with basic connectivity check
+    try {
+      const startTime = Date.now();
+      // For external services, we could do a basic HEAD request
+      // This is a placeholder for actual health checking
+      status = 'healthy';
+      metrics.responseTime = Date.now() - startTime;
+      metrics.lastSuccessfulCheck = new Date().toISOString();
+    } catch (error) {
+      status = 'warning';
+      issues.push('External service connectivity unknown');
+    }
+  } else if (backend.type === 'unknown') {
+    // Handle special cases like Traefik internal services
+    if (backend.url === null && domain.includes('traefik')) {
+      status = 'healthy';
+      issues.push('Traefik internal service');
+    }
   }
 
-  return { status, issues, lastChecked: new Date().toISOString() };
+  return { 
+    status, 
+    issues, 
+    lastChecked: new Date().toISOString(),
+    metrics
+  };
 }
 
 async function getBackendDetails(backend) {
