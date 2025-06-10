@@ -63,6 +63,14 @@ class TraefikUI {
         document.getElementById('cancel-edit').addEventListener('click', () => this.closeServiceModal());
         document.getElementById('service-edit-form').addEventListener('submit', (e) => this.handleServiceEdit(e));
 
+        // Network Management Event Listeners
+        document.getElementById('scan-networks').addEventListener('click', () => this.scanNetworks());
+        document.getElementById('refresh-networks').addEventListener('click', () => this.refreshNetworks());
+        document.getElementById('network-filter').addEventListener('change', (e) => this.filterNetworks(e.target.value));
+        document.getElementById('close-network-modal').addEventListener('click', () => this.closeNetworkModal());
+        document.getElementById('cancel-network-connect').addEventListener('click', () => this.closeNetworkModal());
+        document.getElementById('network-connect-form').addEventListener('submit', (e) => this.handleNetworkConnect(e));
+
         document.querySelectorAll('.template-card').forEach(card => {
             card.addEventListener('click', () => this.useTemplate(card.dataset.template));
         });
@@ -1264,6 +1272,307 @@ networks:
         setTimeout(() => {
             notification.classList.add('hidden');
         }, 3000);
+    }
+
+    // Network Management Methods
+
+    async scanNetworks() {
+        const scanStatus = document.getElementById('network-scan-status');
+        const scanButton = document.getElementById('scan-networks');
+        
+        try {
+            scanStatus.textContent = '🔍 Scanning Docker networks...';
+            scanButton.disabled = true;
+            
+            const response = await fetch('/api/networks/management');
+            const data = await response.json();
+            
+            this.displayNetworkManagement(data);
+            await this.loadNetworkTopology();
+            
+            scanStatus.textContent = `✅ Found ${data.networks.length} networks`;
+        } catch (error) {
+            this.showNotification(error.message, 'error');
+            scanStatus.textContent = '❌ Scan failed';
+        } finally {
+            scanButton.disabled = false;
+            setTimeout(() => {
+                scanStatus.textContent = '';
+            }, 3000);
+        }
+    }
+
+    async refreshNetworks() {
+        await this.scanNetworks();
+    }
+
+    displayNetworkManagement(data) {
+        const traefikContainer = document.getElementById('traefik-networks');
+        const availableContainer = document.getElementById('available-networks');
+        
+        // Display Traefik's current network connections
+        const traefikConnected = data.networks.filter(net => net.isTraefikConnected);
+        traefikContainer.innerHTML = traefikConnected.length > 0 
+            ? traefikConnected.map(network => this.createTraefikNetworkCard(network)).join('')
+            : '<p>Traefik is not connected to any networks.</p>';
+        
+        // Display all available networks
+        this.allNetworks = data.networks;
+        this.displayFilteredNetworks('all');
+    }
+
+    createTraefikNetworkCard(network) {
+        const isPrimary = network.name === 'deploy_traefik';
+        return `
+            <div class="network-card traefik-connected ${isPrimary ? 'primary-network' : ''}">
+                <div class="network-header">
+                    <div class="network-info">
+                        <div class="network-title">
+                            ${network.name} ${isPrimary ? '(Primary)' : ''}
+                            <span class="status-badge connected">Connected</span>
+                        </div>
+                        <div class="network-subtitle">
+                            ${network.driver} • ${network.subnet} • ${network.containerCount} containers
+                        </div>
+                    </div>
+                    <div class="network-actions">
+                        ${!isPrimary ? 
+                            `<button class="btn btn-sm btn-danger" onclick="ui.disconnectFromNetwork('${network.id}', '${network.name}')">
+                                🔌 Disconnect
+                            </button>` : 
+                            '<span class="text-muted">Cannot disconnect</span>'
+                        }
+                    </div>
+                </div>
+                <div class="network-details">
+                    <div class="detail-row">
+                        <span class="detail-label">Network ID:</span>
+                        <span class="detail-value">${network.id.substring(0, 12)}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Gateway:</span>
+                        <span class="detail-value">${network.gateway}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Containers:</span>
+                        <span class="detail-value">
+                            ${network.containers.map(c => c.name).join(', ') || 'None'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    filterNetworks(filter) {
+        this.displayFilteredNetworks(filter);
+    }
+
+    displayFilteredNetworks(filter) {
+        if (!this.allNetworks) return;
+        
+        let filteredNetworks = this.allNetworks;
+        
+        switch (filter) {
+            case 'connected':
+                filteredNetworks = this.allNetworks.filter(net => net.isTraefikConnected);
+                break;
+            case 'disconnected':
+                filteredNetworks = this.allNetworks.filter(net => !net.isTraefikConnected);
+                break;
+            case 'external':
+                filteredNetworks = this.allNetworks.filter(net => 
+                    !['bridge', 'host', 'none'].includes(net.name) && net.attachable);
+                break;
+            default:
+                filteredNetworks = this.allNetworks;
+        }
+        
+        const container = document.getElementById('available-networks');
+        container.innerHTML = filteredNetworks.length > 0 
+            ? filteredNetworks.map(network => this.createNetworkCard(network)).join('')
+            : '<p>No networks match the current filter.</p>';
+    }
+
+    createNetworkCard(network) {
+        const isConnected = network.isTraefikConnected;
+        const canConnect = !isConnected && network.attachable && network.name !== 'none';
+        
+        return `
+            <div class="network-card ${isConnected ? 'connected' : 'disconnected'}">
+                <div class="network-header">
+                    <div class="network-info">
+                        <div class="network-title">
+                            ${network.name}
+                            <span class="status-badge ${isConnected ? 'connected' : 'disconnected'}">
+                                ${isConnected ? 'Connected' : 'Available'}
+                            </span>
+                        </div>
+                        <div class="network-subtitle">
+                            ${network.driver} • ${network.subnet} • ${network.containerCount} containers
+                        </div>
+                    </div>
+                    <div class="network-actions">
+                        ${canConnect ? 
+                            `<button class="btn btn-sm btn-primary" onclick="ui.openNetworkConnectModal('${network.id}', '${network.name}')">
+                                🔗 Connect
+                            </button>` : 
+                            isConnected ? 
+                                `<button class="btn btn-sm btn-danger" onclick="ui.disconnectFromNetwork('${network.id}', '${network.name}')">
+                                    🔌 Disconnect
+                                </button>` :
+                                '<span class="text-muted">Not attachable</span>'
+                        }
+                    </div>
+                </div>
+                <div class="network-details">
+                    <div class="detail-row">
+                        <span class="detail-label">Network ID:</span>
+                        <span class="detail-value">${network.id.substring(0, 12)}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Gateway:</span>
+                        <span class="detail-value">${network.gateway}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Internal:</span>
+                        <span class="detail-value">${network.internal ? 'Yes' : 'No'}</span>
+                    </div>
+                    ${network.containers.length > 0 ? `
+                        <div class="detail-row">
+                            <span class="detail-label">Containers:</span>
+                            <span class="detail-value">
+                                ${network.containers.map(c => c.name).join(', ')}
+                            </span>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    openNetworkConnectModal(networkId, networkName) {
+        document.getElementById('connect-network-id').value = networkId;
+        document.getElementById('connect-network-name').value = networkName;
+        document.getElementById('connect-alias').value = '';
+        document.getElementById('connect-ip').value = '';
+        document.getElementById('network-connect-modal').classList.remove('hidden');
+    }
+
+    closeNetworkModal() {
+        document.getElementById('network-connect-modal').classList.add('hidden');
+    }
+
+    async handleNetworkConnect(e) {
+        e.preventDefault();
+        
+        const networkId = document.getElementById('connect-network-id').value;
+        const alias = document.getElementById('connect-alias').value;
+        const ipAddress = document.getElementById('connect-ip').value;
+        
+        try {
+            const response = await fetch(`/api/networks/${networkId}/connect`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ alias, ipAddress })
+            });
+            
+            if (response.ok) {
+                this.showNotification('Traefik connected to network successfully', 'success');
+                this.closeNetworkModal();
+                await this.refreshNetworks();
+            } else {
+                const error = await response.json();
+                throw new Error(error.error);
+            }
+        } catch (error) {
+            this.showNotification(`Failed to connect: ${error.message}`, 'error');
+        }
+    }
+
+    async disconnectFromNetwork(networkId, networkName) {
+        if (networkName === 'deploy_traefik') {
+            this.showNotification('Cannot disconnect from primary network', 'error');
+            return;
+        }
+        
+        if (!confirm(`Disconnect Traefik from network "${networkName}"?`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/networks/${networkId}/disconnect`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ force: false })
+            });
+            
+            if (response.ok) {
+                this.showNotification('Traefik disconnected from network successfully', 'success');
+                await this.refreshNetworks();
+            } else {
+                const error = await response.json();
+                throw new Error(error.error);
+            }
+        } catch (error) {
+            this.showNotification(`Failed to disconnect: ${error.message}`, 'error');
+        }
+    }
+
+    async loadNetworkTopology() {
+        try {
+            const response = await fetch('/api/networks/topology');
+            const topology = await response.json();
+            this.displayNetworkTopology(topology);
+        } catch (error) {
+            console.error('Failed to load network topology:', error);
+        }
+    }
+
+    displayNetworkTopology(topology) {
+        const container = document.getElementById('network-topology');
+        
+        if (topology.networks.length === 0) {
+            container.innerHTML = '<p>No network topology data available.</p>';
+            return;
+        }
+        
+        let html = '<div class="topology-grid">';
+        
+        topology.networks.forEach(network => {
+            const traefikContainer = network.containers.find(c => c.isTraefik);
+            const otherContainers = network.containers.filter(c => !c.isTraefik);
+            
+            html += `
+                <div class="topology-network ${traefikContainer ? 'has-traefik' : ''}">
+                    <div class="topology-network-header">
+                        <h4>${network.name}</h4>
+                        <span class="topology-subnet">${network.subnet}</span>
+                    </div>
+                    <div class="topology-containers">
+                        ${traefikContainer ? `
+                            <div class="topology-container traefik-container">
+                                <span class="container-icon">🛠️</span>
+                                <span class="container-name">traefik</span>
+                                <span class="container-ip">${traefikContainer.ipAddress}</span>
+                            </div>
+                        ` : ''}
+                        ${otherContainers.map(container => `
+                            <div class="topology-container">
+                                <span class="container-icon">📦</span>
+                                <span class="container-name">${container.name}</span>
+                                <span class="container-ip">${container.ipAddress}</span>
+                            </div>
+                        `).join('')}
+                        ${network.containers.length === 0 ? 
+                            '<div class="topology-empty">No containers</div>' : ''}
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        container.innerHTML = html;
     }
 }
 

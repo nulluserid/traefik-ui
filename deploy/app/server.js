@@ -608,6 +608,201 @@ app.post('/api/dns-providers/:name/test', (req, res) => {
   }
 });
 
+// Network Management API Endpoints
+
+// Get network information with Traefik connection status
+app.get('/api/networks/management', async (req, res) => {
+  try {
+    const networks = await docker.listNetworks();
+    const traefikContainer = docker.getContainer('traefik');
+    let traefikNetworks = [];
+    
+    try {
+      const traefikInfo = await traefikContainer.inspect();
+      traefikNetworks = Object.keys(traefikInfo.NetworkSettings.Networks || {});
+    } catch (error) {
+      console.warn('Could not inspect Traefik container:', error.message);
+    }
+    
+    const networkDetails = [];
+    
+    for (const network of networks) {
+      const details = await docker.getNetwork(network.Id).inspect();
+      const isTraefikConnected = traefikNetworks.includes(network.Name);
+      
+      // Get container count and names
+      const containers = Object.keys(details.Containers || {}).map(containerId => {
+        const containerInfo = details.Containers[containerId];
+        return {
+          id: containerId.substring(0, 12),
+          name: containerInfo.Name,
+          ipAddress: containerInfo.IPv4Address
+        };
+      });
+      
+      networkDetails.push({
+        id: details.Id,
+        name: details.Name,
+        driver: details.Driver,
+        scope: details.Scope,
+        created: details.Created,
+        isTraefikConnected,
+        containerCount: containers.length,
+        containers: containers,
+        subnet: details.IPAM?.Config?.[0]?.Subnet || 'N/A',
+        gateway: details.IPAM?.Config?.[0]?.Gateway || 'N/A',
+        options: details.Options || {},
+        labels: details.Labels || {},
+        internal: details.Internal || false,
+        attachable: details.Attachable !== false,
+        ingress: details.Ingress || false
+      });
+    }
+    
+    res.json({
+      networks: networkDetails,
+      traefikNetworks: traefikNetworks
+    });
+  } catch (error) {
+    console.error('Network management error:', error);
+    res.status(500).json({ error: 'Failed to get network information' });
+  }
+});
+
+// Connect Traefik to a network
+app.post('/api/networks/:networkId/connect', async (req, res) => {
+  try {
+    const { networkId } = req.params;
+    const { alias, ipAddress } = req.body;
+    
+    const network = docker.getNetwork(networkId);
+    const traefikContainer = docker.getContainer('traefik');
+    
+    // Check if network exists
+    await network.inspect();
+    
+    // Connect Traefik to the network
+    const connectConfig = {
+      Container: 'traefik'
+    };
+    
+    if (alias || ipAddress) {
+      connectConfig.EndpointConfig = {};
+      if (alias) {
+        connectConfig.EndpointConfig.Aliases = [alias];
+      }
+      if (ipAddress) {
+        connectConfig.EndpointConfig.IPAMConfig = {
+          IPv4Address: ipAddress
+        };
+      }
+    }
+    
+    await network.connect(connectConfig);
+    
+    res.json({ 
+      success: true, 
+      message: `Traefik successfully connected to network ${networkId}`,
+      networkId,
+      alias,
+      ipAddress
+    });
+  } catch (error) {
+    console.error('Network connect error:', error);
+    res.status(500).json({ 
+      error: `Failed to connect to network: ${error.message}` 
+    });
+  }
+});
+
+// Disconnect Traefik from a network
+app.post('/api/networks/:networkId/disconnect', async (req, res) => {
+  try {
+    const { networkId } = req.params;
+    const { force } = req.body;
+    
+    const network = docker.getNetwork(networkId);
+    
+    // Check if network exists
+    const networkInfo = await network.inspect();
+    
+    // Don't allow disconnecting from the default network
+    if (networkInfo.Name === 'deploy_traefik') {
+      return res.status(400).json({
+        error: 'Cannot disconnect Traefik from its primary network'
+      });
+    }
+    
+    // Disconnect Traefik from the network
+    await network.disconnect({
+      Container: 'traefik',
+      Force: force || false
+    });
+    
+    res.json({ 
+      success: true, 
+      message: `Traefik successfully disconnected from network ${networkId}`,
+      networkId
+    });
+  } catch (error) {
+    console.error('Network disconnect error:', error);
+    res.status(500).json({ 
+      error: `Failed to disconnect from network: ${error.message}` 
+    });
+  }
+});
+
+// Get detailed network topology
+app.get('/api/networks/topology', async (req, res) => {
+  try {
+    const networks = await docker.listNetworks();
+    const containers = await docker.listContainers({ all: true });
+    
+    const topology = {
+      networks: [],
+      connections: []
+    };
+    
+    // Build network topology
+    for (const network of networks) {
+      const details = await docker.getNetwork(network.Id).inspect();
+      const networkNode = {
+        id: details.Id,
+        name: details.Name,
+        driver: details.Driver,
+        subnet: details.IPAM?.Config?.[0]?.Subnet || 'N/A',
+        containers: []
+      };
+      
+      // Add containers in this network
+      Object.keys(details.Containers || {}).forEach(containerId => {
+        const containerInfo = details.Containers[containerId];
+        networkNode.containers.push({
+          id: containerId.substring(0, 12),
+          name: containerInfo.Name,
+          ipAddress: containerInfo.IPv4Address,
+          isTraefik: containerInfo.Name === 'traefik'
+        });
+        
+        // Track connections for visualization
+        topology.connections.push({
+          networkId: details.Id,
+          containerId: containerId.substring(0, 12),
+          containerName: containerInfo.Name,
+          ipAddress: containerInfo.IPv4Address
+        });
+      });
+      
+      topology.networks.push(networkNode);
+    }
+    
+    res.json(topology);
+  } catch (error) {
+    console.error('Network topology error:', error);
+    res.status(500).json({ error: 'Failed to get network topology' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Traefik UI running on http://localhost:${PORT}`);
 });
